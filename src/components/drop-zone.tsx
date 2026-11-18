@@ -3,20 +3,19 @@ import { FILE_ACCEPT, takeFile } from '../lib/files'
 import { errorMessage } from '../lib/error-message'
 import { useI18n } from '../lib/use-i18n'
 import { useEditorStore } from '../store/editor-store'
-import { GithubIcon, InstagramIcon, MailIcon } from './icons'
+import { InstagramIcon, MailIcon } from './icons'
 
 const FORMATS = ['JPG', 'PNG', 'WebP']
 
 interface ContactLink {
   href: string
-  label: 'github' | 'email' | 'instagram'
+  label: 'email' | 'instagram'
   icon: ComponentType<{ className?: string }>
   external?: boolean
 }
 
 const LINKS: ContactLink[] = [
   { href: 'mailto:hialscks@gmail.com', label: 'email', icon: MailIcon },
-  { href: 'https://github.com/KimMinchan95', label: 'github', icon: GithubIcon, external: true },
   { href: 'https://www.instagram.com/chan_pest/', label: 'instagram', icon: InstagramIcon, external: true },
 ]
 

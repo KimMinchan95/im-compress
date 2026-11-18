@@ -55,18 +55,6 @@ export function ExitIcon({ className }: IconProps) {
   )
 }
 
-export function GithubIcon({ className }: IconProps) {
-  return (
-    <Icon className={className}>
-      <path
-        d="M9 19c-4 1.5-4-2.5-6-3m12 5v-3.9a3.4 3.4 0 0 0-.9-2.6c3-.3 6.1-1.5 6.1-6.6a5.1 5.1 0 0 0-1.4-3.5 4.7 4.7 0 0 0-.1-3.5s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.1 5.4 2.4 5.4 2.4a4.7 4.7 0 0 0-.1 3.5A5.1 5.1 0 0 0 3.9 9.4c0 5.1 3.1 6.2 6.1 6.6a3.4 3.4 0 0 0-.9 2.6V21"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Icon>
-  )
-}
-
 export function MailIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
