@@ -5,7 +5,7 @@ import { useI18n } from '../lib/use-i18n'
 import { useEditorStore } from '../store/editor-store'
 import { InstagramIcon, MailIcon } from './icons'
 
-const FORMATS = ['JPG', 'PNG', 'WebP']
+const FORMATS = ['JPG', 'WebP', 'PNG']
 
 interface ContactLink {
   href: string

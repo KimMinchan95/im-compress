@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { sizeFromHeight, sizeFromScale, sizeFromWidth } from '../lib/aspect'
-import { formatFromFile, isSupportedFile } from '../lib/files'
+import { isSupportedFile } from '../lib/files'
 import type { CompareMode, EditorErrorCode, EncodeResult, EncodeStatus, OutputFormat, SizeMode, SourceImage } from '../types'
 import { usePresets } from './preset-store'
 import { useStageStore } from './stage-store'
@@ -117,7 +117,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
           url: URL.createObjectURL(file),
           blob: file,
         },
-        format: preset?.format ?? formatFromFile(file),
+        format: preset?.format ?? 'jpeg',
         quality: preset?.quality ?? DEFAULT_QUALITY,
         width: sized.width,
         height: sized.height,
