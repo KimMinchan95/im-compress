@@ -44,9 +44,24 @@ export function Controls() {
   const [byteUnit, setByteUnit] = useState<ByteUnit>('kb')
   const [downloadStem, setDownloadStem] = useState('')
   const [isPresetOpen, setIsPresetOpen] = useState(false)
-  const [isOpen, setIsOpen] = useState(true)
+  const [isOpen, setIsOpen] = useState(() => window.matchMedia('(min-width: 768px)').matches)
+  const [isSheet, setIsSheet] = useState(false)
   const [toast, setToast] = useState<{ tone: ToastTone; id: number } | null>(null)
   const closePresets = useCallback(() => setIsPresetOpen(false), [])
+  const closeSheet = useCallback(() => {
+    setIsSheet(false)
+    setIsOpen(false)
+    setIsPresetOpen(false)
+  }, [])
+
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 768px)')
+    const closeOnDesktop = () => {
+      if (media.matches) setIsSheet(false)
+    }
+    media.addEventListener('change', closeOnDesktop)
+    return () => media.removeEventListener('change', closeOnDesktop)
+  }, [])
 
   useEffect(() => {
     setDownloadStem('')
@@ -99,8 +114,22 @@ export function Controls() {
     if (next !== undefined) setTargetBytes(next)
   }
 
+  const togglePanel = () => {
+    setIsPresetOpen(false)
+    if (isSheet) {
+      closeSheet()
+      return
+    }
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      setIsOpen(true)
+      setIsSheet(true)
+      return
+    }
+    setIsOpen((open) => !open)
+  }
+
   return (
-    <aside className={panelClass(isOpen)}>
+    <aside className={panelClass(isOpen, isSheet)}>
       <div
         id="settings-panel"
         inert={!isOpen}
@@ -108,6 +137,18 @@ export function Controls() {
         className={`absolute inset-0 overflow-hidden ${isOpen ? '' : 'pointer-events-none invisible'}`}
       >
         <div className="flex h-full min-h-0 w-full min-w-0 flex-col md:min-w-[420px]">
+          {isSheet ? (
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
+              <h2 className="text-base font-semibold">{t('adjustOptions')}</h2>
+              <button
+                type="button"
+                onClick={closeSheet}
+                className="h-10 cursor-pointer rounded-full bg-sunken px-4 text-sm font-semibold ring-1 ring-line"
+              >
+                {t('showImage')}
+              </button>
+            </div>
+          ) : null}
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3 md:gap-4 md:px-5 md:py-5">
             <ControlCard title={t('fileName')} delay={70}>
               <input
@@ -313,32 +354,34 @@ export function Controls() {
           {toast ? <SaveToast tone={toast.tone} message={toast.tone === 'limit' ? t('presetLimit') : t('presetSaved')} /> : null}
         </div>
       </div>
-      <button
-        type="button"
-        aria-expanded={isOpen}
-        aria-controls="settings-panel"
-        aria-label={isOpen ? t('hideSettings') : t('showSettings')}
-        onClick={() => {
-          setIsPresetOpen(false)
-          setIsOpen((open) => !open)
-        }}
-        className={
-          isOpen
-            ? 'absolute top-0 left-1/2 z-30 grid h-8 w-8 -translate-x-1/2 -translate-y-1/2 cursor-pointer place-items-center rounded-full bg-panel text-muted ring-1 ring-line transition duration-200 hover:scale-105 hover:text-cream active:scale-95 md:top-1/2 md:left-0'
-            : 'absolute inset-0 z-20 flex cursor-pointer items-center justify-center gap-2 bg-panel text-muted transition duration-200 hover:bg-sunken hover:text-cream md:flex-col md:gap-3'
-        }
-      >
-        <ChevronIcon
-          className={`h-4 w-4 transition-transform duration-300 ${isOpen ? 'md:-rotate-90' : 'rotate-180 md:rotate-90'}`}
-        />
-        {isOpen ? null : <span className="text-sm font-medium md:[writing-mode:vertical-rl]">{t('settings')}</span>}
-      </button>
+      {isSheet ? null : (
+        <button
+          type="button"
+          aria-expanded={isOpen}
+          aria-controls="settings-panel"
+          aria-label={isOpen ? t('hideSettings') : t('adjustOptions')}
+          onClick={togglePanel}
+          className={
+            isOpen
+              ? 'absolute top-0 left-1/2 z-30 grid h-8 w-8 -translate-x-1/2 -translate-y-1/2 cursor-pointer place-items-center rounded-full bg-panel text-muted ring-1 ring-line transition duration-200 hover:scale-105 hover:text-cream active:scale-95 md:top-1/2 md:left-0'
+              : 'absolute inset-0 z-20 flex cursor-pointer items-center justify-center gap-2 bg-panel text-muted transition duration-200 hover:bg-sunken hover:text-cream md:flex-col md:gap-3'
+          }
+        >
+          <ChevronIcon
+            className={`h-4 w-4 transition-transform duration-300 ${isOpen ? 'md:-rotate-90' : 'rotate-180 md:rotate-90'}`}
+          />
+          {isOpen ? null : <span className="text-sm font-medium md:[writing-mode:vertical-rl]">{t('adjustOptions')}</span>}
+        </button>
+      )}
     </aside>
   )
 }
 
-function panelClass(isOpen: boolean) {
-  const size = isOpen ? 'z-20 min-h-0 w-full flex-1 md:w-[420px] md:flex-none' : 'z-20 h-12 w-full flex-none md:w-12'
+function panelClass(isOpen: boolean, isSheet: boolean) {
+  if (isSheet) return 'fixed inset-0 z-40 h-dvh w-full bg-panel'
+  const size = isOpen
+    ? 'z-20 min-h-0 w-full flex-1 md:w-[420px] md:flex-none'
+    : 'z-20 h-[calc(3.5rem+env(safe-area-inset-bottom))] w-full flex-none md:h-12 md:w-12'
   return `relative border-t border-line bg-panel transition-[width,height] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none md:h-full md:border-t-0 md:border-l ${size}`
 }
 
