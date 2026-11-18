@@ -108,7 +108,7 @@ export function Controls() {
         className={`absolute inset-0 overflow-hidden ${isOpen ? '' : 'pointer-events-none invisible'}`}
       >
         <div className="flex h-full min-h-0 w-full min-w-0 flex-col md:min-w-[420px]">
-          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4 md:py-5">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3 md:gap-4 md:px-5 md:py-5">
             <ControlCard title={t('fileName')} delay={70}>
               <input
                 value={downloadStem}
@@ -272,7 +272,7 @@ export function Controls() {
             </ControlCard>
           </div>
 
-          <div className="flex shrink-0 flex-col gap-2.5 border-t border-line bg-panel px-5 py-4">
+          <div className="flex shrink-0 flex-col gap-2.5 border-t border-line bg-panel px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             {error ? <p className="text-sm text-accent">{errorMessage(locale, error)}</p> : null}
             {status === 'error' ? (
               <button type="button" onClick={retry} className="h-10 cursor-pointer rounded-full border border-line text-sm font-medium">
@@ -338,7 +338,7 @@ export function Controls() {
 }
 
 function panelClass(isOpen: boolean) {
-  const size = isOpen ? 'min-h-0 w-full flex-1 md:w-[420px] md:flex-none' : 'h-12 w-full flex-none md:w-12'
+  const size = isOpen ? 'min-h-0 w-full flex-1 overflow-hidden md:w-[420px] md:flex-none' : 'h-12 w-full flex-none md:w-12'
   return `relative border-t border-line bg-panel transition-[width,height] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none md:h-full md:border-t-0 md:border-l ${size}`
 }
 
@@ -355,7 +355,7 @@ function ControlCard({
 }) {
   return (
     <section
-      className="enter flex flex-col gap-3 rounded-3xl bg-sunken p-4 ring-1 ring-line"
+      className="enter flex flex-col gap-3 rounded-3xl bg-sunken p-3 ring-1 ring-line md:p-4"
       style={{ animationDelay: `${delay}ms` }}
     >
       <div className="flex items-center justify-between gap-3 border-b border-line pb-3">

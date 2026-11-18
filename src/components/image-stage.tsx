@@ -227,7 +227,7 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-nowrap items-center justify-between gap-2 overflow-x-auto">
         <div className="flex rounded-full bg-sunken p-1 ring-1 ring-line" role="group" aria-label={t('split')}>
           <ModeButton pressed={mode === 'original'} onClick={() => pickMode('original')}>
             {t('original')}
@@ -401,7 +401,7 @@ function ModeButton({
       aria-pressed={pressed}
       disabled={disabled}
       onClick={onClick}
-      className={`h-9 cursor-pointer rounded-full px-3 text-sm font-semibold transition duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`h-10 shrink-0 cursor-pointer rounded-full px-2.5 text-[13px] font-semibold transition duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 sm:h-9 sm:px-3 sm:text-sm ${
         pressed ? 'bg-cream text-ink' : 'text-muted hover:text-cream'
       }`}
     >

@@ -42,12 +42,18 @@
 }
 
 @layer base {
+    html {
+        -webkit-text-size-adjust: 100%;
+    }
+
     button,
     [role='button'],
     label,
     summary,
+    a,
     input[type='range'] {
         cursor: pointer;
+        touch-action: manipulation;
     }
 
     button:disabled {

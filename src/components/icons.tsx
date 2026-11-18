@@ -86,6 +86,17 @@ export function InstagramIcon({ className }: IconProps) {
   )
 }
 
+export function ReplaceIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <rect x="3.5" y="6" width="12" height="12" rx="2" />
+      <circle cx="7.4" cy="9.4" r="0.9" fill="currentColor" stroke="none" />
+      <path d="m7.2 14.2 2-2a.7.7 0 0 1 1 0l2.2 2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M16 8.5h4.5M18.2 6.2 20.5 8.5 18.2 10.8" strokeLinecap="round" strokeLinejoin="round" />
+    </Icon>
+  )
+}
+
 export function CloseIcon({ className }: IconProps) {
   return (
     <Icon className={className}>

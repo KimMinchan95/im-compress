@@ -34,7 +34,7 @@ export function PresetDialog({ onClose }: PresetDialogProps) {
 
   return createPortal(
     <div
-      className="overlay-in fixed inset-0 z-50 grid place-items-end bg-ink/75 px-4 py-6 backdrop-blur-sm sm:place-items-center"
+      className="overlay-in fixed inset-0 z-50 grid place-items-end bg-ink/75 px-4 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:place-items-center"
       onClick={onClose}
     >
       <div
