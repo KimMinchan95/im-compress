@@ -7,6 +7,7 @@ interface NumberFieldProps {
   allowDecimal?: boolean
   decimals?: number
   live?: boolean
+  disabled?: boolean
   onChange: (value: number) => void
 }
 
@@ -32,6 +33,7 @@ export function NumberField({
   allowDecimal = false,
   decimals,
   live = true,
+  disabled = false,
   onChange,
 }: NumberFieldProps) {
   const places = decimals ?? (allowDecimal ? 1 : 0)
@@ -45,15 +47,16 @@ export function NumberField({
   }, [blurCount, places, value])
 
   return (
-    <label className="flex min-w-0 flex-col gap-2">
+    <label className={`flex min-w-0 flex-col gap-2 ${disabled ? 'opacity-40' : ''}`}>
       <span className="text-sm font-medium text-muted">{label}</span>
       <span className="flex h-12 items-center gap-2 rounded-2xl border border-line bg-panel px-3 transition duration-200 focus-within:border-accent/70">
         <input
           value={text}
           inputMode={places > 0 ? 'decimal' : 'numeric'}
           spellCheck={false}
+          disabled={disabled}
           aria-label={label}
-          className="w-full bg-transparent text-base font-medium tabular-nums outline-none"
+          className="w-full bg-transparent text-base font-medium tabular-nums outline-none disabled:cursor-not-allowed"
           onFocus={(event) => {
             isFocused.current = true
             event.currentTarget.select()

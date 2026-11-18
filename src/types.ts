@@ -1,5 +1,7 @@
 export type OutputFormat = 'jpeg' | 'webp' | 'png'
 
+export type SizeMode = 'bytes' | 'dimensions'
+
 export type EncodeStatus = 'idle' | 'encoding' | 'error'
 
 export type CompareMode = 'original' | 'result' | 'split'

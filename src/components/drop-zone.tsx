@@ -1,9 +1,17 @@
+import type { ComponentType } from 'react'
+import { useI18n } from '../lib/use-i18n'
 import { useEditorStore } from '../store/editor-store'
 import type { EditorErrorCode } from '../types'
-import { useI18n } from '../lib/use-i18n'
+import { GithubIcon, InstagramIcon, MailIcon } from './icons'
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp'
 const FORMATS = ['JPG', 'PNG', 'WebP']
+
+const LINKS: { href: string; label: 'github' | 'email' | 'instagram'; icon: ComponentType<{ className?: string }>; external?: boolean }[] = [
+  { href: 'mailto:hialscks@gmail.com', label: 'email', icon: MailIcon },
+  { href: 'https://github.com/KimMinchan95', label: 'github', icon: GithubIcon, external: true },
+  { href: 'https://www.instagram.com/chan_pest/', label: 'instagram', icon: InstagramIcon, external: true },
+]
 
 export function DropZone() {
   const error = useEditorStore((state) => state.error)
@@ -28,16 +36,33 @@ export function DropZone() {
           <p className="rise mx-auto mt-4 max-w-xl text-base text-muted md:mx-0" style={{ animationDelay: '150ms' }}>
             {t('heroBody')}
           </p>
-          <div className="mt-6 flex flex-wrap justify-center gap-2 md:justify-start">
+          <p className="mt-6 flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-sm font-medium text-muted md:justify-start">
             {FORMATS.map((label, index) => (
               <span
                 key={label}
-                className="rise rounded-full bg-sunken px-3 py-1.5 text-sm font-semibold ring-1 ring-line"
+                className="rise inline-flex items-center gap-2.5"
                 style={{ animationDelay: `${220 + index * 70}ms` }}
               >
+                {index > 0 ? <span aria-hidden="true" className="h-1 w-1 rounded-full bg-current opacity-40" /> : null}
                 {label}
               </span>
             ))}
+          </p>
+          <div className="mt-8 flex flex-col items-center gap-3 md:items-start">
+            <p className="text-sm text-muted">{t('bugReport')}</p>
+            <div className="flex items-center gap-2">
+              {LINKS.map(({ href, label, icon: Icon, external }) => (
+                <a
+                  key={label}
+                  href={href}
+                  aria-label={t(label)}
+                  {...(external ? { target: '_blank', rel: 'noreferrer' } : {})}
+                  className="grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-sunken text-cream ring-1 ring-line transition duration-200 hover:scale-105 hover:text-accent active:scale-95"
+                >
+                  <Icon className="h-4 w-4" />
+                </a>
+              ))}
+            </div>
           </div>
         </div>
         <div className="flex flex-col items-center gap-5">

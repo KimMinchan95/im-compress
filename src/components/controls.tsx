@@ -1,13 +1,15 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { sizeFromWidth } from '../lib/aspect'
 import { cycleChoice } from '../lib/cycle-choice'
 import { FORMAT_META, FORMATS, QUALITY_PRESETS, downloadName, isResultCurrent } from '../lib/files'
 import { useI18n } from '../lib/use-i18n'
 import { useEditorStore } from '../store/editor-store'
-import { usePresets } from '../store/preset-store'
+import { presetName, usePresets } from '../store/preset-store'
 import { errorText } from './drop-zone'
 import { ChevronIcon } from './icons'
 import { NumberField } from './number-field'
+import { PresetDialog } from './preset-dialog'
 
 const QUALITY_VALUES = QUALITY_PRESETS.map((preset) => preset.value)
 
@@ -28,16 +30,30 @@ export function Controls() {
   const setHeight = useEditorStore((state) => state.setHeight)
   const setScale = useEditorStore((state) => state.setScale)
   const targetBytes = useEditorStore((state) => state.targetBytes)
+  const sizeMode = useEditorStore((state) => state.sizeMode)
   const setTargetBytes = useEditorStore((state) => state.setTargetBytes)
+  const setSizeMode = useEditorStore((state) => state.setSizeMode)
   const resetSize = useEditorStore((state) => state.resetSize)
   const retry = useEditorStore((state) => state.retry)
   const sourceName = source?.name ?? ''
+  const presets = usePresets((state) => state.presets)
+  const savePreset = usePresets((state) => state.savePreset)
   const [byteUnit, setByteUnit] = useState<'kb' | 'mb'>('kb')
   const [downloadStem, setDownloadStem] = useState('')
+  const [isPresetOpen, setIsPresetOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(true)
+  const [toast, setToast] = useState<{ tone: 'saved' | 'limit'; id: number } | null>(null)
+  const closePresets = useCallback(() => setIsPresetOpen(false), [])
 
   useEffect(() => {
     setDownloadStem('')
   }, [sourceName])
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = window.setTimeout(() => setToast(null), toast.tone === 'saved' ? 1800 : 2600)
+    return () => window.clearTimeout(timer)
+  }, [toast])
 
   if (!source) return null
 
@@ -51,13 +67,57 @@ export function Controls() {
   const unitBytes = byteUnit === 'mb' ? 1024 * 1024 : 1024
   const bytesField =
     byteUnit === 'mb' ? Math.round((shownBytes / unitBytes) * 1000) / 1000 : Math.max(1, Math.round(shownBytes / unitBytes))
+  const isBytes = sizeMode === 'bytes'
+
+  const saveCurrent = () => {
+    const savedTarget = isBytes ? targetBytes : null
+    const same = presets.some((preset) => {
+      if (preset.format !== format || preset.quality !== quality || preset.sizeMode !== sizeMode) return false
+      if (sizeMode === 'bytes') return preset.targetBytes === savedTarget
+      return preset.scale === scale
+    })
+    if (same) {
+      setToast({ tone: 'saved', id: Date.now() })
+      return
+    }
+    const result = savePreset({
+      name: presetName(format, quality, scale, savedTarget, sizeMode),
+      format,
+      quality,
+      scale,
+      sizeMode,
+      targetBytes: savedTarget,
+    })
+    setToast({ tone: result, id: Date.now() })
+  }
 
   return (
-    <aside className="flex min-h-0 w-full flex-1 flex-col overflow-hidden border-t border-line bg-panel md:h-full md:w-[420px] md:flex-none md:border-t-0 md:border-l">
+    <aside
+      className={`relative border-t border-line bg-panel transition-[width,height] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none md:h-full md:border-t-0 md:border-l ${
+        isOpen ? 'min-h-0 w-full flex-1 md:w-[420px] md:flex-none' : 'h-12 w-full flex-none md:w-12'
+      }`}
+    >
+      <div
+        id="settings-panel"
+        inert={!isOpen}
+        aria-hidden={!isOpen}
+        className={`absolute inset-0 overflow-hidden ${isOpen ? '' : 'pointer-events-none invisible'}`}
+      >
+      <div className="flex h-full min-h-0 w-full min-w-0 flex-col md:min-w-[420px]">
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4 md:py-5">
-      <PresetSection />
+      <ControlCard title={t('fileName')} delay={70}>
+        <input
+          value={downloadStem}
+          maxLength={120}
+          spellCheck={false}
+          aria-label={t('fileName')}
+          placeholder={fileStem(source.name)}
+          onChange={(event) => setDownloadStem(event.target.value)}
+          className="h-12 rounded-2xl border border-line bg-panel px-3 text-base outline-none transition duration-200 placeholder:text-muted focus:border-accent/70"
+        />
+      </ControlCard>
 
-      <ControlCard title={t('format')} delay={70}>
+      <ControlCard title={t('format')} delay={140}>
         <div className="grid grid-cols-3 gap-2">
           {FORMATS.map((item) => (
             <button
@@ -79,7 +139,7 @@ export function Controls() {
 
       <ControlCard
         title={t('quality')}
-        delay={140}
+        delay={210}
         extra={
           format === 'png' ? null : (
             <span className="text-3xl font-semibold tabular-nums leading-none">{quality}%</span>
@@ -125,19 +185,43 @@ export function Controls() {
 
       <ControlCard
         title={t('size')}
-        delay={210}
+        delay={280}
         extra={
-          <button
-            type="button"
-            onClick={resetSize}
-            disabled={isOriginalSize}
-            className="h-8 cursor-pointer rounded-full px-2 text-sm text-muted transition hover:text-cream disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {t('resetSize')}
-          </button>
+          isBytes ? null : (
+            <button
+              type="button"
+              onClick={resetSize}
+              disabled={isOriginalSize}
+              className="h-8 cursor-pointer rounded-full px-2 text-sm text-muted transition hover:text-cream disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {t('resetSize')}
+            </button>
+          )
         }
       >
         <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-1 rounded-2xl bg-panel p-1 ring-1 ring-line">
+            <button
+              type="button"
+              aria-pressed={isBytes}
+              onClick={() => setSizeMode('bytes')}
+              className={`h-10 cursor-pointer rounded-xl text-sm font-semibold transition duration-200 ${
+                isBytes ? 'bg-cream text-ink' : 'text-muted hover:text-cream'
+              }`}
+            >
+              {t('bytes')}
+            </button>
+            <button
+              type="button"
+              aria-pressed={!isBytes}
+              onClick={() => setSizeMode('dimensions')}
+              className={`h-10 cursor-pointer rounded-xl text-sm font-semibold transition duration-200 ${
+                isBytes ? 'text-muted hover:text-cream' : 'bg-cream text-ink'
+              }`}
+            >
+              {t('sizeByDimensions')}
+            </button>
+          </div>
           <div className="flex items-end gap-2">
             <div className="min-w-0 flex-1">
               <NumberField
@@ -145,6 +229,7 @@ export function Controls() {
                 value={bytesField}
                 decimals={byteUnit === 'mb' ? 3 : 0}
                 live={false}
+                disabled={!isBytes}
                 onChange={(value) => {
                   const bytes = Math.round(value * unitBytes)
                   const tolerance = byteUnit === 'mb' ? 512 : 1024
@@ -158,12 +243,13 @@ export function Controls() {
                 }}
               />
             </div>
-            <div className="flex h-12 shrink-0 rounded-2xl bg-panel p-1 ring-1 ring-line">
+            <div className={`flex h-12 shrink-0 rounded-2xl bg-panel p-1 ring-1 ring-line ${isBytes ? '' : 'opacity-40'}`}>
               <button
                 type="button"
                 aria-pressed={byteUnit === 'kb'}
+                disabled={!isBytes}
                 onClick={() => setByteUnit('kb')}
-                className={`cursor-pointer rounded-xl px-3 text-sm font-semibold transition duration-200 ${
+                className={`cursor-pointer rounded-xl px-3 text-sm font-semibold transition duration-200 disabled:cursor-not-allowed ${
                   byteUnit === 'kb' ? 'bg-cream text-ink' : 'text-muted hover:text-cream'
                 }`}
               >
@@ -172,8 +258,9 @@ export function Controls() {
               <button
                 type="button"
                 aria-pressed={byteUnit === 'mb'}
+                disabled={!isBytes}
                 onClick={() => setByteUnit('mb')}
-                className={`cursor-pointer rounded-xl px-3 text-sm font-semibold transition duration-200 ${
+                className={`cursor-pointer rounded-xl px-3 text-sm font-semibold transition duration-200 disabled:cursor-not-allowed ${
                   byteUnit === 'mb' ? 'bg-cream text-ink' : 'text-muted hover:text-cream'
                 }`}
               >
@@ -181,35 +268,42 @@ export function Controls() {
               </button>
             </div>
           </div>
-          <p className="text-sm text-muted">{t('targetHint')}</p>
+          <p className="text-sm text-muted">{isBytes ? t('targetHint') : t('dimensionHint')}</p>
           <div className="grid grid-cols-3 gap-2">
-            <NumberField label={t('width')} value={width} suffix="px" onChange={setWidth} />
-            <NumberField label={t('height')} value={height} suffix="px" onChange={setHeight} />
-            <NumberField label={t('scale')} value={scale} suffix="%" allowDecimal onChange={setScale} />
+            <NumberField label={t('width')} value={width} suffix="px" disabled={isBytes} onChange={setWidth} />
+            <NumberField label={t('height')} value={height} suffix="px" disabled={isBytes} onChange={setHeight} />
+            <NumberField label={t('scale')} value={scale} suffix="%" allowDecimal disabled={isBytes} onChange={setScale} />
           </div>
         </div>
       </ControlCard>
-
-      <ControlCard title={t('fileName')} delay={280}>
-        <input
-          value={downloadStem}
-          maxLength={120}
-          spellCheck={false}
-          aria-label={t('fileName')}
-          placeholder={fileStem(source.name)}
-          onChange={(event) => setDownloadStem(event.target.value)}
-          className="h-12 rounded-2xl border border-line bg-panel px-3 text-base outline-none transition duration-200 placeholder:text-muted focus:border-accent/70"
-        />
-      </ControlCard>
       </div>
 
-      <div className="flex shrink-0 flex-col gap-3 border-t border-line bg-panel px-5 py-4">
+      <div className="flex shrink-0 flex-col gap-2.5 border-t border-line bg-panel px-5 py-4">
         {error ? <p className="text-sm text-accent">{errorText(t, error)}</p> : null}
         {status === 'error' ? (
-          <button type="button" onClick={retry} className="h-11 cursor-pointer rounded-full border border-line text-sm font-medium">
+          <button type="button" onClick={retry} className="h-10 cursor-pointer rounded-full border border-line text-sm font-medium">
             {t('retry')}
           </button>
         ) : null}
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded={isPresetOpen}
+            onClick={() => setIsPresetOpen(true)}
+            className="h-10 cursor-pointer rounded-full border border-line bg-sunken text-sm font-medium transition duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
+          >
+            {t('loadSettings')}
+            {presets.length > 0 ? <span className="ml-1.5 text-muted">{presets.length}</span> : null}
+          </button>
+          <button
+            type="button"
+            onClick={saveCurrent}
+            className="h-10 cursor-pointer rounded-full border border-line bg-sunken text-sm font-semibold transition duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
+          >
+            {t('saveSettings')}
+          </button>
+        </div>
         <button
           type="button"
           disabled={!canDownload}
@@ -221,13 +315,37 @@ export function Controls() {
             anchor.download = downloadName(typed || source.name, result.format)
             anchor.click()
           }}
-          className={`h-12 cursor-pointer rounded-full bg-accent text-base font-semibold text-on-accent transition duration-200 hover:-translate-y-0.5 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${
+          className={`h-11 cursor-pointer rounded-full bg-accent text-sm font-semibold text-on-accent transition duration-200 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-40 ${
             status === 'encoding' ? 'cursor-wait' : 'disabled:cursor-not-allowed'
           }`}
         >
           {status === 'encoding' ? t('encoding') : t('download')}
         </button>
       </div>
+      {isPresetOpen ? <PresetDialog onClose={closePresets} /> : null}
+      {toast ? <SaveToast tone={toast.tone} message={toast.tone === 'limit' ? t('presetLimit') : t('presetSaved')} /> : null}
+      </div>
+      </div>
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        aria-controls="settings-panel"
+        aria-label={isOpen ? t('hideSettings') : t('showSettings')}
+        onClick={() => {
+          setIsPresetOpen(false)
+          setIsOpen((open) => !open)
+        }}
+        className={
+          isOpen
+            ? 'absolute top-0 left-1/2 z-20 grid h-8 w-8 -translate-x-1/2 -translate-y-1/2 cursor-pointer place-items-center rounded-full bg-panel text-muted ring-1 ring-line transition duration-200 hover:scale-105 hover:text-cream active:scale-95 md:top-1/2 md:left-0'
+            : 'absolute inset-0 z-20 flex cursor-pointer items-center justify-center gap-2 bg-panel text-muted transition duration-200 hover:bg-sunken hover:text-cream md:flex-col md:gap-3'
+        }
+      >
+        <ChevronIcon
+          className={`h-4 w-4 transition-transform duration-300 ${isOpen ? 'md:-rotate-90' : 'rotate-180 md:rotate-90'}`}
+        />
+        {isOpen ? null : <span className="text-sm font-medium md:[writing-mode:vertical-rl]">{t('settings')}</span>}
+      </button>
     </aside>
   )
 }
@@ -260,102 +378,23 @@ function ControlCard({
   )
 }
 
+function SaveToast({ tone, message }: { tone: 'saved' | 'limit'; message: string }) {
+  return createPortal(
+    <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[60] flex justify-center px-4">
+      <p
+        role="status"
+        className={`overlay-in rounded-full px-4 py-2.5 text-sm font-semibold shadow-[0_12px_40px_rgba(0,0,0,0.28)] ${
+          tone === 'limit' ? 'bg-accent text-on-accent' : 'bg-cream text-ink'
+        }`}
+      >
+        {message}
+      </p>
+    </div>,
+    document.body,
+  )
+}
+
 function fileStem(fileName: string) {
   const stem = fileName.replace(/\.[^.]+$/, '').trim()
   return stem || fileName
-}
-
-function PresetSection() {
-  const { t } = useI18n()
-  const source = useEditorStore((state) => state.source)
-  const format = useEditorStore((state) => state.format)
-  const quality = useEditorStore((state) => state.quality)
-  const scale = useEditorStore((state) => state.scale)
-  const setFormat = useEditorStore((state) => state.setFormat)
-  const setQuality = useEditorStore((state) => state.setQuality)
-  const setScale = useEditorStore((state) => state.setScale)
-  const presets = usePresets((state) => state.presets)
-  const savePreset = usePresets((state) => state.savePreset)
-  const removePreset = usePresets((state) => state.removePreset)
-  const [name, setName] = useState(() => (source ? fileStem(source.name) : ''))
-  const [isOpen, setIsOpen] = useState(false)
-  const [notice, setNotice] = useState<'saved' | 'limit' | null>(null)
-
-  useEffect(() => {
-    if (!source) return
-    setName(fileStem(source.name))
-  }, [source])
-
-  const onSave = (event: FormEvent) => {
-    event.preventDefault()
-    const result = savePreset({ name, format, quality, scale })
-    setNotice(result)
-    if (result === 'saved') {
-      setIsOpen(true)
-      if (source) setName(fileStem(source.name))
-    }
-  }
-
-  return (
-    <section className="enter overflow-hidden rounded-3xl bg-sunken ring-1 ring-line">
-      <button
-        type="button"
-        aria-expanded={isOpen}
-        onClick={() => setIsOpen((open) => !open)}
-        className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-4 text-left"
-      >
-        <span className="flex items-center gap-2 text-base font-semibold tracking-tight">
-          <span className="h-4 w-1 rounded-full bg-accent" />
-          {t('saved')}
-          {presets.length > 0 ? <span className="text-sm font-medium text-muted">{presets.length}</span> : null}
-        </span>
-        <ChevronIcon className={`h-5 w-5 text-muted transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-      <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
-        <div className="overflow-hidden" inert={isOpen ? undefined : true}>
-          <div className="flex flex-col gap-3 border-t border-line px-4 py-4">
-            <form className="flex items-center gap-2" onSubmit={onSave}>
-              <input
-                value={name}
-                maxLength={40}
-                aria-label={t('saved')}
-                onChange={(event) => setName(event.target.value)}
-                className="h-12 min-w-0 flex-1 rounded-2xl border border-line bg-panel px-3 text-base outline-none transition duration-200 focus:border-accent/70"
-              />
-              <button type="submit" className="h-12 shrink-0 cursor-pointer rounded-2xl bg-cream px-4 text-sm font-semibold text-ink transition active:scale-[0.97]">
-                {t('save')}
-              </button>
-            </form>
-            {notice === 'saved' ? <p className="text-sm text-muted">{t('presetSaved')}</p> : null}
-            {notice === 'limit' ? <p className="text-sm text-accent">{t('presetLimit')}</p> : null}
-            {presets.length === 0 ? (
-              <p className="text-sm text-muted">{t('emptyPresets')}</p>
-            ) : (
-              <ul className="flex max-h-40 flex-col gap-2 overflow-y-auto">
-                {presets.map((preset) => (
-                  <li key={preset.id} className="flex items-center gap-2 rounded-2xl bg-panel px-3 py-2">
-                    <span className="min-w-0 flex-1 truncate text-sm">{preset.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormat(preset.format)
-                        setQuality(preset.quality)
-                        setScale(preset.scale)
-                      }}
-                      className="h-9 cursor-pointer rounded-full bg-cream px-3 text-sm font-semibold text-ink"
-                    >
-                      {t('load')}
-                    </button>
-                    <button type="button" onClick={() => removePreset(preset.id)} className="h-9 cursor-pointer px-1 text-sm text-muted">
-                      {t('remove')}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      </div>
-    </section>
-  )
 }

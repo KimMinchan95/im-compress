@@ -17,7 +17,7 @@ export function Preview() {
   if (!source) return null
 
   return (
-    <section className="enter relative flex min-h-0 min-w-0 flex-[1.15] flex-col px-4 py-3 md:flex-1 md:px-8">
+    <section className="enter relative flex h-full min-h-0 min-w-0 flex-1 flex-col px-4 py-3 md:px-8">
       <div className="orb orb-c" />
       <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col">
         <ImageStage

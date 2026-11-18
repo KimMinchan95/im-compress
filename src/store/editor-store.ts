@@ -1,8 +1,9 @@
 import { create } from 'zustand'
 import { sizeFromHeight, sizeFromScale, sizeFromWidth } from '../lib/aspect'
 import { formatFromFile, isSupportedFile } from '../lib/files'
+import { usePresets } from './preset-store'
 import { useStageStore } from './stage-store'
-import type { CompareMode, EditorErrorCode, EncodeResult, EncodeStatus, OutputFormat, SourceImage } from '../types'
+import type { CompareMode, EditorErrorCode, EncodeResult, EncodeStatus, OutputFormat, SizeMode, SourceImage } from '../types'
 
 const DEFAULT_QUALITY = 80
 
@@ -14,6 +15,7 @@ interface EditorStore {
   height: number
   scale: number
   targetBytes: number | null
+  sizeMode: SizeMode
   matchedTarget: number | null
   result: EncodeResult | null
   compareMode: CompareMode
@@ -28,6 +30,14 @@ interface EditorStore {
   setHeight: (height: number) => void
   setScale: (scale: number) => void
   setTargetBytes: (targetBytes: number | null) => void
+  setSizeMode: (sizeMode: SizeMode) => void
+  applySettings: (settings: {
+    format: OutputFormat
+    quality: number
+    scale: number
+    sizeMode: SizeMode
+    targetBytes: number | null
+  }) => void
   resetSize: () => void
   leave: () => void
   setCompareMode: (compareMode: CompareMode) => void
@@ -56,6 +66,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   height: 0,
   scale: 100,
   targetBytes: null,
+  sizeMode: 'dimensions',
   matchedTarget: null,
   result: null,
   compareMode: 'split',
@@ -84,6 +95,10 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       const current = get()
       if (current.source) releaseLater(current.source.url)
       if (current.result) releaseLater(current.result.url)
+      const { presets, defaultId } = usePresets.getState()
+      const preset = presets.find((item) => item.id === defaultId) ?? null
+      const sized =
+        preset?.sizeMode === 'dimensions' ? sizeFromScale(width, height, preset.scale) : fitted
 
       set({
         source: {
@@ -94,12 +109,13 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
           url: URL.createObjectURL(file),
           blob: file,
         },
-        format: formatFromFile(file),
-        quality: DEFAULT_QUALITY,
-        width: fitted.width,
-        height: fitted.height,
-        scale: fitted.scale,
-        targetBytes: null,
+        format: preset?.format ?? formatFromFile(file),
+        quality: preset?.quality ?? DEFAULT_QUALITY,
+        width: sized.width,
+        height: sized.height,
+        scale: sized.scale,
+        sizeMode: preset?.sizeMode ?? 'dimensions',
+        targetBytes: preset?.sizeMode === 'bytes' ? preset.targetBytes : null,
         matchedTarget: null,
         result: null,
         status: 'idle',
@@ -147,7 +163,33 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       set({ targetBytes: null, matchedTarget: null })
       return
     }
-    set({ targetBytes: Math.round(targetBytes), matchedTarget: null })
+    set({ targetBytes: Math.round(targetBytes), sizeMode: 'bytes', matchedTarget: null })
+  },
+
+  setSizeMode: (sizeMode) => {
+    if (sizeMode === 'bytes') {
+      set({ sizeMode, matchedTarget: null })
+      return
+    }
+    set({ sizeMode, targetBytes: null, matchedTarget: null })
+  },
+
+  applySettings: ({ format, quality, scale, sizeMode, targetBytes }) => {
+    const source = get().source
+    if (!source) return
+    const bytes = sizeMode === 'bytes' && targetBytes != null && targetBytes >= 1 ? Math.round(targetBytes) : null
+    const sized =
+      sizeMode === 'dimensions'
+        ? sizeFromScale(source.width, source.height, scale)
+        : sizeFromWidth(source.width, source.height, source.width)
+    set({
+      format,
+      quality: Math.min(100, Math.max(1, Math.round(quality))),
+      ...sized,
+      sizeMode,
+      targetBytes: bytes,
+      matchedTarget: null,
+    })
   },
 
   resetSize: () => {
@@ -168,6 +210,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       height: 0,
       scale: 100,
       targetBytes: null,
+      sizeMode: 'dimensions',
       matchedTarget: null,
       status: 'idle',
       error: null,
