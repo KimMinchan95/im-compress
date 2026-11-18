@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { sizeFromHeight, sizeFromScale, sizeFromWidth } from '../lib/aspect'
 import { formatFromFile, isSupportedFile } from '../lib/files'
-import type { CompareView, EditorErrorCode, EncodeResult, EncodeStatus, OutputFormat, SourceImage } from '../types'
+import { useStageStore } from './stage-store'
+import type { CompareMode, EditorErrorCode, EncodeResult, EncodeStatus, OutputFormat, SourceImage } from '../types'
 
 const DEFAULT_QUALITY = 80
 
@@ -12,8 +13,10 @@ interface EditorStore {
   width: number
   height: number
   scale: number
+  targetBytes: number | null
+  matchedTarget: number | null
   result: EncodeResult | null
-  view: CompareView
+  compareMode: CompareMode
   status: EncodeStatus
   error: EditorErrorCode | null
   isReading: boolean
@@ -24,12 +27,19 @@ interface EditorStore {
   setWidth: (width: number) => void
   setHeight: (height: number) => void
   setScale: (scale: number) => void
+  setTargetBytes: (targetBytes: number | null) => void
   resetSize: () => void
-  setView: (view: CompareView) => void
-  toggleView: () => void
+  setCompareMode: (compareMode: CompareMode) => void
   retry: () => void
   beginEncode: () => void
   applyResult: (result: EncodeResult) => void
+  applyMatched: (matched: {
+    result: EncodeResult
+    quality: number
+    width: number
+    height: number
+    scale: number
+  }) => void
   applyError: (error: EditorErrorCode) => void
 }
 
@@ -44,8 +54,10 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   width: 0,
   height: 0,
   scale: 100,
+  targetBytes: null,
+  matchedTarget: null,
   result: null,
-  view: 'result',
+  compareMode: 'split',
   status: 'idle',
   error: null,
   isReading: false,
@@ -86,12 +98,14 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         width: fitted.width,
         height: fitted.height,
         scale: fitted.scale,
+        targetBytes: null,
+        matchedTarget: null,
         result: null,
-        view: 'result',
         status: 'idle',
         error: null,
         isReading: false,
       })
+      useStageStore.getState().reset()
     } catch {
       set({
         isReading: false,
@@ -100,43 +114,50 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     }
   },
 
-  setFormat: (format) => set({ format }),
+  setFormat: (format) => set({ format, matchedTarget: null }),
 
   setQuality: (quality) => {
-    set({ quality: Math.min(100, Math.max(1, Math.round(quality))) })
+    set({
+      quality: Math.min(100, Math.max(1, Math.round(quality))),
+      matchedTarget: null,
+    })
   },
 
   setWidth: (width) => {
     const source = get().source
     if (!source) return
-    set(sizeFromWidth(source.width, source.height, width))
+    set({ ...sizeFromWidth(source.width, source.height, width), targetBytes: null, matchedTarget: null })
   },
 
   setHeight: (height) => {
     const source = get().source
     if (!source) return
-    set(sizeFromHeight(source.width, source.height, height))
+    set({ ...sizeFromHeight(source.width, source.height, height), targetBytes: null, matchedTarget: null })
   },
 
   setScale: (scale) => {
     const source = get().source
     if (!source) return
-    set(sizeFromScale(source.width, source.height, scale))
+    set({ ...sizeFromScale(source.width, source.height, scale), targetBytes: null, matchedTarget: null })
+  },
+
+  setTargetBytes: (targetBytes) => {
+    if (targetBytes == null || targetBytes < 1) {
+      set({ targetBytes: null, matchedTarget: null })
+      return
+    }
+    set({ targetBytes: Math.round(targetBytes), matchedTarget: null })
   },
 
   resetSize: () => {
     const source = get().source
     if (!source) return
-    set(sizeFromWidth(source.width, source.height, source.width))
+    set({ ...sizeFromWidth(source.width, source.height, source.width), targetBytes: null, matchedTarget: null })
   },
 
-  setView: (view) => set({ view }),
+  setCompareMode: (compareMode) => set({ compareMode }),
 
-  toggleView: () => {
-    set({ view: get().view === 'original' ? 'result' : 'original' })
-  },
-
-  retry: () => set((state) => ({ retryToken: state.retryToken + 1, error: null })),
+  retry: () => set((state) => ({ retryToken: state.retryToken + 1, error: null, matchedTarget: null })),
 
   beginEncode: () => set({ status: 'encoding', error: null }),
 
@@ -144,6 +165,21 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     const previous = get().result
     if (previous) releaseLater(previous.url)
     set({ result, status: 'idle', error: null })
+  },
+
+  applyMatched: ({ result, quality, width, height, scale }) => {
+    const previous = get().result
+    if (previous) releaseLater(previous.url)
+    set({
+      result,
+      quality,
+      width,
+      height,
+      scale,
+      matchedTarget: get().targetBytes,
+      status: 'idle',
+      error: null,
+    })
   },
 
   applyError: (error) => set({ status: 'error', error }),

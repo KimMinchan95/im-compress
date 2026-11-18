@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { formatBytes, savingsOf } from '../lib/format-bytes'
 import { isResultCurrent } from '../lib/files'
 import { useI18n } from '../lib/use-i18n'
 import { useEditorStore } from '../store/editor-store'
-import { CloseIcon } from './icons'
+import { useStageStore } from '../store/stage-store'
 import { ImageStage } from './image-stage'
 
 export function Preview() {
-  const [isFullscreen, setIsFullscreen] = useState(false)
-  const closeFullscreen = useCallback(() => setIsFullscreen(false), [])
+  const isFullscreen = useStageStore((state) => state.isFullscreen)
+  const closeFullscreen = useStageStore((state) => state.closeFullscreen)
   const source = useEditorStore((state) => state.source)
   const result = useEditorStore((state) => state.result)
   const caption = useSavingsCaption()
@@ -17,15 +17,16 @@ export function Preview() {
   if (!source) return null
 
   return (
-    <section className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center px-5 py-4 md:px-10">
-      <div className="pointer-events-none absolute top-16 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-accent/20 blur-3xl" />
-      <div className="relative z-10 max-w-full">
+    <section className="enter relative flex min-h-0 min-w-0 flex-[1.15] flex-col px-4 py-3 md:flex-1 md:px-8">
+      <div className="orb orb-c" />
+      <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col">
         <ImageStage
           originalUrl={source.url}
           resultUrl={result?.url ?? null}
+          width={source.width}
+          height={source.height}
           layout="page"
           caption={caption}
-          onFullscreen={() => setIsFullscreen(true)}
         />
       </div>
       {isFullscreen ? createPortal(<Fullscreen onClose={closeFullscreen} />, document.body) : null}
@@ -63,7 +64,7 @@ function Fullscreen({ onClose }: { onClose: () => void }) {
   const frameRef = useRef<HTMLDivElement>(null)
   const source = useEditorStore((state) => state.source)
   const result = useEditorStore((state) => state.result)
-  const { t } = useI18n()
+  const caption = useSavingsCaption()
 
   useEffect(() => {
     const node = frameRef.current
@@ -94,17 +95,16 @@ function Fullscreen({ onClose }: { onClose: () => void }) {
   if (!source) return null
 
   return (
-    <div ref={frameRef} className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-ink px-6 pt-20 pb-10">
-      <button
-        type="button"
-        aria-label={t('close')}
-        onClick={onClose}
-        className="absolute top-5 right-5 grid h-11 w-11 place-items-center rounded-full bg-sunken text-cream ring-1 ring-line"
-      >
-        <CloseIcon />
-      </button>
-      <div className="flex min-h-0 flex-1 items-center justify-center pt-4">
-        <ImageStage originalUrl={source.url} resultUrl={result?.url ?? null} layout="fullscreen" />
+    <div ref={frameRef} className="overlay-in fixed inset-0 z-40 flex flex-col overflow-hidden bg-ink px-4 py-4">
+      <div className="flex min-h-0 flex-1">
+        <ImageStage
+          originalUrl={source.url}
+          resultUrl={result?.url ?? null}
+          width={source.width}
+          height={source.height}
+          layout="fullscreen"
+          caption={caption}
+        />
       </div>
     </div>
   )

@@ -2,7 +2,7 @@ export type OutputFormat = 'jpeg' | 'webp' | 'png'
 
 export type EncodeStatus = 'idle' | 'encoding' | 'error'
 
-export type CompareView = 'original' | 'result'
+export type CompareMode = 'original' | 'result' | 'split'
 
 export type EditorErrorCode = 'unsupported' | 'unreadable' | 'encode-failed'
 

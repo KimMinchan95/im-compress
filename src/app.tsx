@@ -5,6 +5,7 @@ import { Preview } from './components/preview'
 import { MoonIcon, SunIcon } from './components/icons'
 import { useI18n } from './lib/use-i18n'
 import { useEncoder } from './lib/use-encoder'
+import { useHydrated, useResolvedTheme } from './lib/use-theme'
 import { useEditorStore } from './store/editor-store'
 import { usePreferences } from './store/preferences-store'
 
@@ -18,15 +19,17 @@ function EncodeBridge() {
 }
 
 function ThemeSync() {
-  const theme = usePreferences((state) => state.theme)
   const locale = usePreferences((state) => state.locale)
+  const resolved = useResolvedTheme()
+  const hydrated = useHydrated()
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme
+    if (!hydrated) return
+    document.documentElement.dataset.theme = resolved
     document.documentElement.lang = locale
     document.title = locale === 'ko' ? '이미지 압축' : 'Compress'
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'light' ? '#f3efe7' : '#100f0d')
-  }, [locale, theme])
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolved === 'light' ? '#f3efe7' : '#100f0d')
+  }, [hydrated, locale, resolved])
 
   return null
 }
@@ -34,17 +37,18 @@ function ThemeSync() {
 function Header() {
   const hasSource = useEditorStore((state) => state.source !== null)
   const loadFile = useEditorStore((state) => state.loadFile)
-  const theme = usePreferences((state) => state.theme)
   const locale = usePreferences((state) => state.locale)
   const setTheme = usePreferences((state) => state.setTheme)
   const setLocale = usePreferences((state) => state.setLocale)
+  const resolved = useResolvedTheme()
   const { t } = useI18n()
   const inputRef = useRef<HTMLInputElement>(null)
+  const nextLocale = locale === 'ko' ? 'en' : 'ko'
 
   return (
-    <header className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 md:px-8">
+    <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-5 py-4 md:px-8">
       <div className="flex items-center gap-2.5">
-        <span className="h-2.5 w-2.5 rounded-full bg-accent" />
+        <span className="brand-dot inline-block h-2.5 w-2.5 rounded-full bg-accent" />
         <span className="text-sm font-semibold tracking-[0.2em]">{t('brand')}</span>
       </div>
       <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
@@ -52,26 +56,37 @@ function Header() {
         <div className="flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
-            aria-label={theme === 'dark' ? t('themeToLight') : t('themeToDark')}
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="grid h-10 w-10 place-items-center rounded-full bg-sunken text-cream ring-1 ring-line"
+            aria-label={resolved === 'dark' ? t('themeToLight') : t('themeToDark')}
+            onClick={() => setTheme(resolved === 'dark' ? 'light' : 'dark')}
+            className="grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-sunken text-cream ring-1 ring-line transition duration-200 hover:scale-105 active:scale-95"
           >
-            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+            <span key={resolved} className="icon-pop grid place-items-center">
+              {resolved === 'dark' ? <SunIcon /> : <MoonIcon />}
+            </span>
           </button>
-          <div className="flex rounded-full bg-sunken p-1 ring-1 ring-line" role="group" aria-label={t('language')}>
-            <HeaderChoice pressed={locale === 'ko'} onClick={() => setLocale('ko')}>
+          <button
+            type="button"
+            aria-label={t('language')}
+            onClick={() => setLocale(nextLocale)}
+            className="relative grid h-10 cursor-pointer grid-cols-2 items-center rounded-full bg-sunken p-1 ring-1 ring-line"
+          >
+            <span
+              className="absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-full bg-cream transition-transform duration-300 ease-out"
+              style={{ transform: locale === 'en' ? 'translateX(100%)' : 'translateX(0)' }}
+            />
+            <span className={`relative z-10 px-3 text-sm font-semibold transition-colors duration-300 ${locale === 'ko' ? 'text-ink' : 'text-muted'}`}>
               한글
-            </HeaderChoice>
-            <HeaderChoice pressed={locale === 'en'} onClick={() => setLocale('en')}>
+            </span>
+            <span className={`relative z-10 px-3 text-sm font-semibold transition-colors duration-300 ${locale === 'en' ? 'text-ink' : 'text-muted'}`}>
               EN
-            </HeaderChoice>
-          </div>
+            </span>
+          </button>
           {hasSource ? (
             <>
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
-                className="h-10 rounded-full bg-sunken px-4 text-sm ring-1 ring-line"
+                className="h-10 cursor-pointer rounded-full bg-sunken px-4 text-sm ring-1 ring-line"
               >
                 {t('changeImage')}
               </button>
@@ -94,28 +109,6 @@ function Header() {
   )
 }
 
-function HeaderChoice({
-  pressed,
-  onClick,
-  children,
-}: {
-  pressed: boolean
-  onClick: () => void
-  children: string
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={pressed}
-      onClick={onClick}
-      className={`h-8 rounded-full px-3 text-sm font-medium transition ${pressed ? 'bg-cream text-ink' : 'text-muted hover:text-cream'
-        }`}
-    >
-      {children}
-    </button>
-  )
-}
-
 export default function App() {
   const hasSource = useEditorStore((state) => state.source !== null)
   const loadFile = useEditorStore((state) => state.loadFile)
@@ -125,7 +118,7 @@ export default function App() {
 
   return (
     <div
-      className="relative min-h-dvh bg-ink font-sans text-cream"
+      className="relative min-h-dvh overflow-x-hidden bg-ink font-sans text-cream"
       onDragEnter={(event) => {
         if (!hasFileDrop(event.dataTransfer.types)) return
         event.preventDefault()
@@ -154,10 +147,10 @@ export default function App() {
     >
       <ThemeSync />
       <EncodeBridge />
-      <div className="mx-auto flex min-h-dvh max-w-[1440px] flex-col">
+      <div className={`mx-auto flex max-w-[1440px] flex-col ${hasSource ? 'h-dvh overflow-hidden' : 'min-h-dvh'}`}>
         <Header />
         {hasSource ? (
-          <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
             <Preview />
             <Controls />
           </div>
@@ -166,8 +159,8 @@ export default function App() {
         )}
       </div>
       {isDragging ? (
-        <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center bg-ink/80 px-6 text-center backdrop-blur-sm">
-          <p className="text-4xl font-semibold tracking-tight">{t('dropOverlay')}</p>
+        <div className="overlay-in pointer-events-none absolute inset-0 z-20 grid place-items-center bg-ink/80 px-6 text-center backdrop-blur-sm">
+          <p className="rise text-4xl font-semibold tracking-tight">{t('dropOverlay')}</p>
         </div>
       ) : null}
     </div>

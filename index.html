@@ -5,17 +5,22 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta name="theme-color" content="#100f0d" />
         <title>이미지 압축</title>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <script>
             try {
                 var saved = JSON.parse(
                     localStorage.getItem('im-compress-preferences') || '{}'
                 );
-                var theme =
-                    saved.state && saved.state.theme === 'light'
-                        ? 'light'
-                        : 'dark';
+                var version = typeof saved.version === 'number' ? saved.version : 0;
+                var choice = saved.state && saved.state.theme;
                 var locale =
                     saved.state && saved.state.locale === 'en' ? 'en' : 'ko';
+                var prefersLight = window.matchMedia(
+                    '(prefers-color-scheme: light)'
+                ).matches;
+                var theme = prefersLight ? 'light' : 'dark';
+                if (version >= 1 && (choice === 'light' || choice === 'dark'))
+                    theme = choice;
                 document.documentElement.dataset.theme = theme;
                 document.documentElement.lang = locale;
                 var themeColor = document.querySelector(
@@ -27,7 +32,12 @@
                         theme === 'light' ? '#f3efe7' : '#100f0d'
                     );
             } catch (error) {
-                document.documentElement.dataset.theme = 'dark';
+                var fallbackLight = window.matchMedia(
+                    '(prefers-color-scheme: light)'
+                ).matches;
+                document.documentElement.dataset.theme = fallbackLight
+                    ? 'light'
+                    : 'dark';
             }
         </script>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
