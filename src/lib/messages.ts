@@ -4,7 +4,7 @@ export type MessageKey = keyof typeof ko
 
 const ko = {
   brand: '압축',
-  stayLocal: '이미지는 이 기기를 나가지 않아요',
+  stayLocal: '서버로 전송되지 않고 기기에서 바로 변환됩니다.',
   eyebrow: '브라우저 안에서',
   heroTitle: '이미지를 가볍게 만들어 보세요',
   heroBody: 'JPG, WebP, PNG를 올리면 바로 줄일 수 있어요. 원본이랑도 바로 비교해 보세요.',
@@ -54,6 +54,8 @@ const ko = {
   emptyPresets: '아직 저장한 설정이 없어요',
   presetLimit: '설정은 8개까지 저장할 수 있어요',
   presetSaved: '저장했어요',
+  expand: '열기',
+  collapse: '닫기',
   low: '낮음',
   medium: '보통',
   high: '높음',
@@ -65,7 +67,7 @@ const ko = {
 
 const en: { [Key in MessageKey]: (typeof ko)[Key] } = {
   brand: 'Compress',
-  stayLocal: 'Images stay on this device',
+  stayLocal: 'Converted on this device. Nothing is sent to a server.',
   eyebrow: 'In this browser',
   heroTitle: 'Make your image lighter',
   heroBody: 'Drop a JPG, WebP, or PNG and compare it with the original right away.',
@@ -115,6 +117,8 @@ const en: { [Key in MessageKey]: (typeof ko)[Key] } = {
   emptyPresets: 'No saved settings yet',
   presetLimit: 'You can save up to 8 settings',
   presetSaved: 'Saved',
+  expand: 'Show',
+  collapse: 'Hide',
   low: 'Low',
   medium: 'Medium',
   high: 'High',

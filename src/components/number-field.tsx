@@ -40,13 +40,13 @@ export function NumberField({
   return (
     <label className="flex min-w-0 flex-col gap-2">
       <span className="text-[11px] font-medium tracking-[0.14em] text-muted">{label}</span>
-      <span className="flex h-12 items-center gap-2 rounded-2xl border border-line bg-sunken px-3 transition focus-within:border-cream/40">
+      <span className="flex h-10 items-center gap-2 rounded-2xl border border-line bg-sunken px-3 transition focus-within:border-cream/40">
         <input
           value={text}
           inputMode={allowDecimal ? 'decimal' : 'numeric'}
           spellCheck={false}
           aria-label={label}
-          className="w-full bg-transparent text-base font-medium tabular-nums outline-none"
+          className="w-full bg-transparent text-sm font-medium tabular-nums outline-none"
           onFocus={(event) => {
             isFocused.current = true
             event.currentTarget.select()

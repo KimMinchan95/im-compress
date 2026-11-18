@@ -57,7 +57,7 @@ export function useEncoder() {
   useEffect(() => {
     if (!source || width < 1 || height < 1) return
 
-    let cancelEncode = () => {}
+    let cancelEncode = () => { }
     let cancelled = false
     beginEncode()
 

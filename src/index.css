@@ -1,108 +1,108 @@
 @import 'tailwindcss';
 
 @theme inline {
-  --font-sans: 'Outfit', ui-sans-serif, system-ui, sans-serif;
-  --color-ink: var(--ink);
-  --color-panel: var(--panel);
-  --color-sunken: var(--sunken);
-  --color-cream: var(--cream);
-  --color-muted: var(--muted);
-  --color-line: var(--line);
-  --color-accent: var(--accent);
-  --color-on-accent: var(--on-accent);
+    --font-sans: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+    --color-ink: var(--ink);
+    --color-panel: var(--panel);
+    --color-sunken: var(--sunken);
+    --color-cream: var(--cream);
+    --color-muted: var(--muted);
+    --color-line: var(--line);
+    --color-accent: var(--accent);
+    --color-on-accent: var(--on-accent);
 }
 
 :root,
 :root[data-theme='dark'] {
-  color-scheme: dark;
-  --ink: #100f0d;
-  --panel: #191815;
-  --sunken: #100f0d;
-  --cream: #f6f1e7;
-  --muted: #a39c90;
-  --line: #34322c;
-  --accent: #ff4d2e;
-  --on-accent: #1a0906;
-  --checker-a: #23221e;
-  --checker-b: #2e2c27;
+    color-scheme: dark;
+    --ink: #100f0d;
+    --panel: #191815;
+    --sunken: #100f0d;
+    --cream: #f6f1e7;
+    --muted: #a39c90;
+    --line: #34322c;
+    --accent: #ff4d2e;
+    --on-accent: #1a0906;
+    --checker-a: #23221e;
+    --checker-b: #2e2c27;
 }
 
 :root[data-theme='light'] {
-  color-scheme: light;
-  --ink: #f3efe7;
-  --panel: #fffdf9;
-  --sunken: #e7e1d6;
-  --cream: #1c1916;
-  --muted: #5e564c;
-  --line: #ddd4c6;
-  --accent: #ff4d2e;
-  --on-accent: #1a0906;
-  --checker-a: #efe8dc;
-  --checker-b: #e2d9cb;
+    color-scheme: light;
+    --ink: #f3efe7;
+    --panel: #fffdf9;
+    --sunken: #e7e1d6;
+    --cream: #1c1916;
+    --muted: #5e564c;
+    --line: #ddd4c6;
+    --accent: #ff4d2e;
+    --on-accent: #1a0906;
+    --checker-a: #efe8dc;
+    --checker-b: #e2d9cb;
 }
 
 body {
-  margin: 0;
-  min-height: 100dvh;
-  background: var(--ink);
-  color: var(--cream);
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--ink);
+    color: var(--cream);
 }
 
 ::selection {
-  background: #ff4d2e;
-  color: #1a0906;
+    background: #ff4d2e;
+    color: #1a0906;
 }
 
 .checker {
-  background-color: var(--checker-a);
-  background-image:
-    linear-gradient(45deg, var(--checker-b) 25%, transparent 25%),
-    linear-gradient(-45deg, var(--checker-b) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, var(--checker-b) 75%),
-    linear-gradient(-45deg, transparent 75%, var(--checker-b) 75%);
-  background-size: 20px 20px;
-  background-position:
-    0 0,
-    0 10px,
-    10px -10px,
-    -10px 0;
+    background-color: var(--checker-a);
+    background-image:
+        linear-gradient(45deg, var(--checker-b) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--checker-b) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--checker-b) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--checker-b) 75%);
+    background-size: 20px 20px;
+    background-position:
+        0 0,
+        0 10px,
+        10px -10px,
+        -10px 0;
 }
 
 .quality-slider {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 18px;
-  border-radius: 999px;
-  background-color: transparent;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 100% 4px;
-  outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 18px;
+    border-radius: 999px;
+    background-color: transparent;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 100% 4px;
+    outline: none;
 }
 
 .quality-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  margin-top: 0;
-  border: 0;
-  border-radius: 999px;
-  background: var(--cream);
-  cursor: pointer;
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    margin-top: 0;
+    border: 0;
+    border-radius: 999px;
+    background: var(--cream);
+    cursor: pointer;
 }
 
 .quality-slider::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--cream);
-  cursor: pointer;
+    width: 18px;
+    height: 18px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--cream);
+    cursor: pointer;
 }
 
 .quality-slider::-moz-range-track {
-  height: 4px;
-  background: transparent;
-  border: 0;
+    height: 4px;
+    background: transparent;
+    border: 0;
 }

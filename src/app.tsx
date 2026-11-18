@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Controls } from './components/controls'
 import { ACCEPT, DropZone } from './components/drop-zone'
 import { Preview } from './components/preview'
+import { MoonIcon, SunIcon } from './components/icons'
 import { useI18n } from './lib/use-i18n'
 import { useEncoder } from './lib/use-encoder'
 import { useEditorStore } from './store/editor-store'
@@ -46,47 +47,48 @@ function Header() {
         <span className="h-2.5 w-2.5 rounded-full bg-accent" />
         <span className="text-sm font-semibold tracking-[0.2em]">{t('brand')}</span>
       </div>
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <div className="flex rounded-full bg-sunken p-1 ring-1 ring-line" role="group" aria-label={t('themeToLight')}>
-          <HeaderChoice pressed={theme === 'light'} onClick={() => setTheme('light')}>
-            {t('themeToLight')}
-          </HeaderChoice>
-          <HeaderChoice pressed={theme === 'dark'} onClick={() => setTheme('dark')}>
-            {t('themeToDark')}
-          </HeaderChoice>
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+        <p className="hidden text-right text-xs leading-5 text-muted sm:block">{t('stayLocal')}</p>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            aria-label={theme === 'dark' ? t('themeToLight') : t('themeToDark')}
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="grid h-10 w-10 place-items-center rounded-full bg-sunken text-cream ring-1 ring-line"
+          >
+            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+          </button>
+          <div className="flex rounded-full bg-sunken p-1 ring-1 ring-line" role="group" aria-label={t('language')}>
+            <HeaderChoice pressed={locale === 'ko'} onClick={() => setLocale('ko')}>
+              한글
+            </HeaderChoice>
+            <HeaderChoice pressed={locale === 'en'} onClick={() => setLocale('en')}>
+              EN
+            </HeaderChoice>
+          </div>
+          {hasSource ? (
+            <>
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                className="h-10 rounded-full bg-sunken px-4 text-sm ring-1 ring-line"
+              >
+                {t('changeImage')}
+              </button>
+              <input
+                ref={inputRef}
+                type="file"
+                accept={ACCEPT}
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  event.currentTarget.value = ''
+                  if (file) void loadFile(file)
+                }}
+              />
+            </>
+          ) : null}
         </div>
-        <div className="flex rounded-full bg-sunken p-1 ring-1 ring-line" role="group" aria-label={t('language')}>
-          <HeaderChoice pressed={locale === 'ko'} onClick={() => setLocale('ko')}>
-            한글
-          </HeaderChoice>
-          <HeaderChoice pressed={locale === 'en'} onClick={() => setLocale('en')}>
-            EN
-          </HeaderChoice>
-        </div>
-        {hasSource ? (
-          <>
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              className="h-10 rounded-full bg-sunken px-4 text-sm ring-1 ring-line"
-            >
-              {t('changeImage')}
-            </button>
-            <input
-              ref={inputRef}
-              type="file"
-              accept={ACCEPT}
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0]
-                event.currentTarget.value = ''
-                if (file) void loadFile(file)
-              }}
-            />
-          </>
-        ) : (
-          <p className="hidden text-xs text-muted sm:block">{t('stayLocal')}</p>
-        )}
       </div>
     </header>
   )
@@ -106,9 +108,8 @@ function HeaderChoice({
       type="button"
       aria-pressed={pressed}
       onClick={onClick}
-      className={`h-8 rounded-full px-3 text-sm font-medium transition ${
-        pressed ? 'bg-cream text-ink' : 'text-muted hover:text-cream'
-      }`}
+      className={`h-8 rounded-full px-3 text-sm font-medium transition ${pressed ? 'bg-cream text-ink' : 'text-muted hover:text-cream'
+        }`}
     >
       {children}
     </button>
