@@ -324,7 +324,7 @@ export function Controls() {
         }}
         className={
           isOpen
-            ? 'absolute top-0 left-1/2 z-20 grid h-8 w-8 -translate-x-1/2 -translate-y-1/2 cursor-pointer place-items-center rounded-full bg-panel text-muted ring-1 ring-line transition duration-200 hover:scale-105 hover:text-cream active:scale-95 md:top-1/2 md:left-0'
+            ? 'absolute top-0 left-1/2 z-30 grid h-8 w-8 -translate-x-1/2 -translate-y-1/2 cursor-pointer place-items-center rounded-full bg-panel text-muted ring-1 ring-line transition duration-200 hover:scale-105 hover:text-cream active:scale-95 md:top-1/2 md:left-0'
             : 'absolute inset-0 z-20 flex cursor-pointer items-center justify-center gap-2 bg-panel text-muted transition duration-200 hover:bg-sunken hover:text-cream md:flex-col md:gap-3'
         }
       >
@@ -338,7 +338,7 @@ export function Controls() {
 }
 
 function panelClass(isOpen: boolean) {
-  const size = isOpen ? 'min-h-0 w-full flex-1 overflow-hidden md:w-[420px] md:flex-none' : 'h-12 w-full flex-none md:w-12'
+  const size = isOpen ? 'z-20 min-h-0 w-full flex-1 md:w-[420px] md:flex-none' : 'z-20 h-12 w-full flex-none md:w-12'
   return `relative border-t border-line bg-panel transition-[width,height] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none md:h-full md:border-t-0 md:border-l ${size}`
 }
 
