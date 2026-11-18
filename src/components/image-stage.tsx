@@ -259,13 +259,6 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
         </div>
       </div>
 
-      {mode === 'split' ? (
-        <div className="flex shrink-0 items-center justify-between px-1 text-xs font-medium text-muted">
-          <span>{t('original')}</span>
-          <span>{t('compressed')}</span>
-        </div>
-      ) : null}
-
       <div ref={shellRef} className="relative min-h-0 w-full flex-1">
       <div ref={viewportRef} className="absolute inset-0 overflow-auto overscroll-contain">
         {shownW > 0 ? (
@@ -369,6 +362,20 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
         >
           <span className="pointer-events-none absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.25)]" />
           <span className="pointer-events-none absolute top-1/2 left-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.35)]" />
+          <span
+            className={`pointer-events-none absolute z-20 whitespace-nowrap rounded-full bg-[#100f0d]/75 px-2.5 py-1 text-xs font-medium text-[#f6f1e7] ${
+              split < 16 ? 'top-2 left-full ml-2' : 'top-2 right-full mr-2'
+            }`}
+          >
+            {t('original')}
+          </span>
+          <span
+            className={`pointer-events-none absolute z-20 whitespace-nowrap rounded-full bg-[#100f0d]/75 px-2.5 py-1 text-xs font-medium text-[#f6f1e7] ${
+              split > 84 ? 'top-9 right-full mr-2' : split < 16 ? 'top-9 left-full ml-2' : 'top-2 left-full ml-2'
+            }`}
+          >
+            {t('compressed')}
+          </span>
         </div>
       ) : null}
       </div>

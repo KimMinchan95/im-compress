@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Controls } from './components/controls'
 import { ACCEPT, DropZone } from './components/drop-zone'
 import { Preview } from './components/preview'
-import { MoonIcon, SunIcon } from './components/icons'
+import { ExitIcon, MoonIcon, SunIcon } from './components/icons'
 import { useI18n } from './lib/use-i18n'
 import { useEncoder } from './lib/use-encoder'
 import { useHydrated, useResolvedTheme } from './lib/use-theme'
@@ -37,6 +37,7 @@ function ThemeSync() {
 function Header() {
   const hasSource = useEditorStore((state) => state.source !== null)
   const loadFile = useEditorStore((state) => state.loadFile)
+  const leave = useEditorStore((state) => state.leave)
   const locale = usePreferences((state) => state.locale)
   const setTheme = usePreferences((state) => state.setTheme)
   const setLocale = usePreferences((state) => state.setLocale)
@@ -48,6 +49,16 @@ function Header() {
   return (
     <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-5 py-4 md:px-8">
       <div className="flex items-center gap-2.5">
+        {hasSource ? (
+          <button
+            type="button"
+            aria-label={t('leave')}
+            onClick={leave}
+            className="grid h-8 w-8 cursor-pointer place-items-center rounded-full text-muted transition duration-200 hover:bg-sunken hover:text-cream active:scale-95"
+          >
+            <ExitIcon className="h-4 w-4" />
+          </button>
+        ) : null}
         <span className="brand-dot inline-block h-2.5 w-2.5 rounded-full bg-accent" />
         <span className="text-sm font-semibold tracking-[0.2em]">{t('brand')}</span>
       </div>

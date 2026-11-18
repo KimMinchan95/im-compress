@@ -35,6 +35,16 @@ export function ChevronIcon({ className = 'h-5 w-5' }: IconProps) {
   )
 }
 
+export function ExitIcon({ className = 'h-5 w-5' }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M10 7 5 12l5 5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 12h9" strokeLinecap="round" />
+      <path d="M19 5v14" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function CloseIcon({ className = 'h-5 w-5' }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none" stroke="currentColor" strokeWidth="1.8">

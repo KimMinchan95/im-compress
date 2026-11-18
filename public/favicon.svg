@@ -1,10 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <style>
-    .bg { fill: #100f0d; }
-    @media (prefers-color-scheme: light) {
-      .bg { fill: #f3efe7; }
-    }
-  </style>
-  <rect width="32" height="32" rx="8" class="bg" />
-  <circle cx="16" cy="16" r="6.5" fill="#ff4d2e" />
+  <defs>
+    <clipPath id="card">
+      <rect width="32" height="32" rx="9" />
+    </clipPath>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b7e2ff" />
+      <stop offset="1" stop-color="#79c7ff" />
+    </linearGradient>
+  </defs>
+  <g clip-path="url(#card)">
+    <rect width="32" height="32" fill="url(#sky)" />
+    <rect y="14" width="32" height="8" fill="#7ecf86" />
+    <rect y="22" width="32" height="10" fill="#ead7ae" />
+    <circle cx="23" cy="8.2" r="3.5" fill="#ff4d2e" />
+    <circle cx="23" cy="8.2" r="1.7" fill="#ffe1a8" />
+    <ellipse cx="23.4" cy="25.4" rx="4.6" ry="2.7" fill="#2f6b45" />
+    <rect width="15" height="32" fill="#100f0d" opacity="0.16" />
+    <rect x="14.7" width="1.7" height="32" fill="#ffffff" />
+  </g>
 </svg>

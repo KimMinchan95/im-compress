@@ -29,6 +29,7 @@ interface EditorStore {
   setScale: (scale: number) => void
   setTargetBytes: (targetBytes: number | null) => void
   resetSize: () => void
+  leave: () => void
   setCompareMode: (compareMode: CompareMode) => void
   retry: () => void
   beginEncode: () => void
@@ -153,6 +154,26 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     const source = get().source
     if (!source) return
     set({ ...sizeFromWidth(source.width, source.height, source.width), targetBytes: null, matchedTarget: null })
+  },
+
+  leave: () => {
+    const current = get()
+    if (current.source) releaseLater(current.source.url)
+    if (current.result) releaseLater(current.result.url)
+    set({
+      source: null,
+      result: null,
+      quality: DEFAULT_QUALITY,
+      width: 0,
+      height: 0,
+      scale: 100,
+      targetBytes: null,
+      matchedTarget: null,
+      status: 'idle',
+      error: null,
+      isReading: false,
+    })
+    useStageStore.getState().reset()
   },
 
   setCompareMode: (compareMode) => set({ compareMode }),

@@ -3,7 +3,7 @@ import type { EditorErrorCode } from '../types'
 import { useI18n } from '../lib/use-i18n'
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp'
-const FORMATS = ['JPG', 'WebP', 'PNG']
+const FORMATS = ['JPG', 'PNG', 'WebP']
 
 export function DropZone() {
   const error = useEditorStore((state) => state.error)
