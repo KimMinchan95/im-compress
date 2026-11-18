@@ -1,0 +1,47 @@
+import type { EncodeResult, OutputFormat } from '../types'
+
+export const FORMAT_META: Record<OutputFormat, { label: string; mime: string; extension: string }> = {
+  jpeg: { label: 'JPG', mime: 'image/jpeg', extension: 'jpg' },
+  webp: { label: 'WebP', mime: 'image/webp', extension: 'webp' },
+  png: { label: 'PNG', mime: 'image/png', extension: 'png' },
+}
+
+export const FORMATS: OutputFormat[] = ['jpeg', 'webp', 'png']
+
+export const QUALITY_PRESETS = [
+  { id: 'low', value: 40 },
+  { id: 'medium', value: 65 },
+  { id: 'high', value: 80 },
+  { id: 'best', value: 92 },
+] as const
+
+const SUPPORTED_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
+const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp']
+
+export function isSupportedFile(file: File) {
+  if (SUPPORTED_TYPES.has(file.type)) return true
+  const name = file.name.toLowerCase()
+  return SUPPORTED_EXTENSIONS.some((extension) => name.endsWith(extension))
+}
+
+export function formatFromFile(file: File): OutputFormat {
+  const name = file.name.toLowerCase()
+  if (file.type === 'image/png' || name.endsWith('.png')) return 'png'
+  if (file.type === 'image/webp' || name.endsWith('.webp')) return 'webp'
+  return 'jpeg'
+}
+
+export function downloadName(name: string, format: OutputFormat) {
+  const base = name.replace(/\.[^.]+$/, '') || 'image'
+  return `${base}.${FORMAT_META[format].extension}`
+}
+
+export function isResultCurrent(
+  result: EncodeResult,
+  options: { format: OutputFormat; width: number; height: number; quality: number },
+) {
+  if (result.format !== options.format) return false
+  if (result.width !== options.width || result.height !== options.height) return false
+  if (options.format !== 'png' && result.quality !== options.quality) return false
+  return true
+}
