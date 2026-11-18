@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { paintDocumentTheme } from '../lib/document-theme'
 
 export type Theme = 'light' | 'dark'
 export type ThemeChoice = 'system' | Theme
@@ -8,10 +9,8 @@ export type Locale = 'ko' | 'en'
 interface PreferencesState {
   theme: ThemeChoice
   locale: Locale
-  splitView: boolean
   setTheme: (theme: ThemeChoice) => void
   setLocale: (locale: Locale) => void
-  setSplitView: (splitView: boolean) => void
 }
 
 export function resolveTheme(choice: ThemeChoice): Theme {
@@ -22,9 +21,7 @@ export function resolveTheme(choice: ThemeChoice): Theme {
 
 function paintTheme(theme: ThemeChoice) {
   if (typeof document === 'undefined') return
-  const resolved = resolveTheme(theme)
-  document.documentElement.dataset.theme = resolved
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolved === 'light' ? '#f3efe7' : '#100f0d')
+  paintDocumentTheme(resolveTheme(theme))
 }
 
 function commitTheme(theme: ThemeChoice, set: (partial: Partial<PreferencesState>) => void) {
@@ -32,13 +29,9 @@ function commitTheme(theme: ThemeChoice, set: (partial: Partial<PreferencesState
     paintTheme(theme)
     set({ theme })
   }
-  const reduce =
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  if (
-    typeof document !== 'undefined' &&
-    typeof document.startViewTransition === 'function' &&
-    !reduce
-  ) {
+  const reduce = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const canTransition = typeof document !== 'undefined' && typeof document.startViewTransition === 'function'
+  if (canTransition && !reduce) {
     document.startViewTransition(apply)
     return
   }
@@ -50,13 +43,11 @@ export const usePreferences = create<PreferencesState>()(
     (set) => ({
       theme: 'system',
       locale: 'ko',
-      splitView: false,
       setTheme: (theme) => commitTheme(theme, set),
       setLocale: (locale) => {
         if (typeof document !== 'undefined') document.documentElement.lang = locale
         set({ locale })
       },
-      setSplitView: (splitView) => set({ splitView }),
     }),
     {
       name: 'im-compress-preferences',

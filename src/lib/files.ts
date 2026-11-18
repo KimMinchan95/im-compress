@@ -18,6 +18,8 @@ export const QUALITY_PRESETS = [
 const SUPPORTED_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp']
 
+export const FILE_ACCEPT = ['image/jpeg', 'image/png', 'image/webp', ...SUPPORTED_EXTENSIONS].join(',')
+
 export function isSupportedFile(file: File) {
   if (SUPPORTED_TYPES.has(file.type)) return true
   const name = file.name.toLowerCase()
@@ -31,9 +33,24 @@ export function formatFromFile(file: File): OutputFormat {
   return 'jpeg'
 }
 
+function stripExtension(name: string) {
+  return name.replace(/\.[^.]+$/, '')
+}
+
+export function fileStem(fileName: string) {
+  const stem = stripExtension(fileName).trim()
+  return stem || fileName
+}
+
 export function downloadName(name: string, format: OutputFormat) {
-  const base = name.replace(/\.[^.]+$/, '') || 'image'
+  const base = stripExtension(name) || 'image'
   return `${base}.${FORMAT_META[format].extension}`
+}
+
+export function takeFile(input: HTMLInputElement) {
+  const file = input.files?.[0] ?? null
+  input.value = ''
+  return file
 }
 
 export function isResultCurrent(

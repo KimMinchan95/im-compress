@@ -1,20 +1,23 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { sizeFromWidth } from '../lib/aspect'
+import { byteFieldValue, targetFromField, type ByteUnit } from '../lib/byte-field'
 import { cycleChoice } from '../lib/cycle-choice'
-import { FORMAT_META, FORMATS, QUALITY_PRESETS, downloadName, isResultCurrent } from '../lib/files'
+import { errorMessage } from '../lib/error-message'
+import { FORMAT_META, FORMATS, QUALITY_PRESETS, downloadName, fileStem, isResultCurrent } from '../lib/files'
 import { useI18n } from '../lib/use-i18n'
 import { useEditorStore } from '../store/editor-store'
-import { presetName, usePresets } from '../store/preset-store'
-import { errorText } from './drop-zone'
+import { isSamePreset, presetName, usePresets } from '../store/preset-store'
 import { ChevronIcon } from './icons'
 import { NumberField } from './number-field'
 import { PresetDialog } from './preset-dialog'
 
 const QUALITY_VALUES = QUALITY_PRESETS.map((preset) => preset.value)
 
+type ToastTone = 'saved' | 'limit'
+
 export function Controls() {
-  const { t } = useI18n()
+  const { locale, t } = useI18n()
   const source = useEditorStore((state) => state.source)
   const format = useEditorStore((state) => state.format)
   const quality = useEditorStore((state) => state.quality)
@@ -38,11 +41,11 @@ export function Controls() {
   const sourceName = source?.name ?? ''
   const presets = usePresets((state) => state.presets)
   const savePreset = usePresets((state) => state.savePreset)
-  const [byteUnit, setByteUnit] = useState<'kb' | 'mb'>('kb')
+  const [byteUnit, setByteUnit] = useState<ByteUnit>('kb')
   const [downloadStem, setDownloadStem] = useState('')
   const [isPresetOpen, setIsPresetOpen] = useState(false)
   const [isOpen, setIsOpen] = useState(true)
-  const [toast, setToast] = useState<{ tone: 'saved' | 'limit'; id: number } | null>(null)
+  const [toast, setToast] = useState<{ tone: ToastTone; id: number } | null>(null)
   const closePresets = useCallback(() => setIsPresetOpen(false), [])
 
   useEffect(() => {
@@ -64,267 +67,251 @@ export function Controls() {
   const isOriginalSize = width === fitted.width && height === fitted.height
   const outputBytes = result?.bytes ?? source.bytes
   const shownBytes = targetBytes ?? outputBytes
-  const unitBytes = byteUnit === 'mb' ? 1024 * 1024 : 1024
-  const bytesField =
-    byteUnit === 'mb' ? Math.round((shownBytes / unitBytes) * 1000) / 1000 : Math.max(1, Math.round(shownBytes / unitBytes))
   const isBytes = sizeMode === 'bytes'
+  const bytesField = byteFieldValue(shownBytes, byteUnit)
 
   const saveCurrent = () => {
     const savedTarget = isBytes ? targetBytes : null
-    const same = presets.some((preset) => {
-      if (preset.format !== format || preset.quality !== quality || preset.sizeMode !== sizeMode) return false
-      if (sizeMode === 'bytes') return preset.targetBytes === savedTarget
-      return preset.scale === scale
-    })
-    if (same) {
+    const draft = { format, quality, scale, sizeMode, targetBytes: savedTarget }
+    const alreadySaved = presets.some((preset) => isSamePreset(preset, draft))
+    if (alreadySaved) {
       setToast({ tone: 'saved', id: Date.now() })
       return
     }
-    const result = savePreset({
+    const outcome = savePreset({
       name: presetName(format, quality, scale, savedTarget, sizeMode),
-      format,
-      quality,
-      scale,
-      sizeMode,
-      targetBytes: savedTarget,
+      ...draft,
     })
-    setToast({ tone: result, id: Date.now() })
+    setToast({ tone: outcome, id: Date.now() })
+  }
+
+  const download = () => {
+    if (!result) return
+    const typed = downloadStem.trim()
+    const anchor = document.createElement('a')
+    anchor.href = result.url
+    anchor.download = downloadName(typed || source.name, result.format)
+    anchor.click()
+  }
+
+  const commitBytes = (value: number) => {
+    const next = targetFromField(value, byteUnit, targetBytes, outputBytes)
+    if (next !== undefined) setTargetBytes(next)
   }
 
   return (
-    <aside
-      className={`relative border-t border-line bg-panel transition-[width,height] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none md:h-full md:border-t-0 md:border-l ${
-        isOpen ? 'min-h-0 w-full flex-1 md:w-[420px] md:flex-none' : 'h-12 w-full flex-none md:w-12'
-      }`}
-    >
+    <aside className={panelClass(isOpen)}>
       <div
         id="settings-panel"
         inert={!isOpen}
         aria-hidden={!isOpen}
         className={`absolute inset-0 overflow-hidden ${isOpen ? '' : 'pointer-events-none invisible'}`}
       >
-      <div className="flex h-full min-h-0 w-full min-w-0 flex-col md:min-w-[420px]">
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4 md:py-5">
-      <ControlCard title={t('fileName')} delay={70}>
-        <input
-          value={downloadStem}
-          maxLength={120}
-          spellCheck={false}
-          aria-label={t('fileName')}
-          placeholder={fileStem(source.name)}
-          onChange={(event) => setDownloadStem(event.target.value)}
-          className="h-12 rounded-2xl border border-line bg-panel px-3 text-base outline-none transition duration-200 placeholder:text-muted focus:border-accent/70"
-        />
-      </ControlCard>
-
-      <ControlCard title={t('format')} delay={140}>
-        <div className="grid grid-cols-3 gap-2">
-          {FORMATS.map((item) => (
-            <button
-              key={item}
-              type="button"
-              aria-pressed={format === item}
-              onClick={() => setFormat(cycleChoice(format, item, FORMATS))}
-              className={`h-12 cursor-pointer rounded-2xl text-base font-semibold transition duration-200 active:scale-[0.97] ${
-                format === item
-                  ? 'bg-cream text-ink shadow-[0_8px_24px_rgba(0,0,0,0.12)]'
-                  : 'bg-panel text-cream hover:-translate-y-0.5 hover:bg-cream/10'
-              }`}
-            >
-              {FORMAT_META[item].label}
-            </button>
-          ))}
-        </div>
-      </ControlCard>
-
-      <ControlCard
-        title={t('quality')}
-        delay={210}
-        extra={
-          format === 'png' ? null : (
-            <span className="text-3xl font-semibold tabular-nums leading-none">{quality}%</span>
-          )
-        }
-      >
-        {format === 'png' ? (
-          <p className="rounded-2xl bg-panel px-4 py-3 text-sm text-muted">{t('pngLossless')}</p>
-        ) : (
-          <>
-            <div className="grid grid-cols-4 gap-2">
-              {QUALITY_PRESETS.map((preset) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  aria-pressed={quality === preset.value}
-                  onClick={() => setQuality(cycleChoice(quality, preset.value, QUALITY_VALUES))}
-                  className={`h-11 cursor-pointer rounded-xl text-sm font-semibold transition duration-200 active:scale-[0.97] ${
-                    quality === preset.value ? 'bg-cream text-ink' : 'bg-panel text-muted hover:-translate-y-0.5 hover:text-cream'
-                  }`}
-                >
-                  {t(preset.id)}
-                </button>
-              ))}
-            </div>
-            <input
-              type="range"
-              min={1}
-              max={100}
-              step={1}
-              value={quality}
-              aria-label={t('quality')}
-              aria-valuetext={`${quality}%`}
-              onChange={(event) => setQuality(Number(event.target.value))}
-              className="quality-slider mt-1"
-              style={{
-                backgroundImage: `linear-gradient(to right, var(--accent) ${quality}%, var(--line) ${quality}%)`,
-              }}
-            />
-          </>
-        )}
-      </ControlCard>
-
-      <ControlCard
-        title={t('size')}
-        delay={280}
-        extra={
-          isBytes ? null : (
-            <button
-              type="button"
-              onClick={resetSize}
-              disabled={isOriginalSize}
-              className="h-8 cursor-pointer rounded-full px-2 text-sm text-muted transition hover:text-cream disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {t('resetSize')}
-            </button>
-          )
-        }
-      >
-        <div className="flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-1 rounded-2xl bg-panel p-1 ring-1 ring-line">
-            <button
-              type="button"
-              aria-pressed={isBytes}
-              onClick={() => setSizeMode('bytes')}
-              className={`h-10 cursor-pointer rounded-xl text-sm font-semibold transition duration-200 ${
-                isBytes ? 'bg-cream text-ink' : 'text-muted hover:text-cream'
-              }`}
-            >
-              {t('bytes')}
-            </button>
-            <button
-              type="button"
-              aria-pressed={!isBytes}
-              onClick={() => setSizeMode('dimensions')}
-              className={`h-10 cursor-pointer rounded-xl text-sm font-semibold transition duration-200 ${
-                isBytes ? 'text-muted hover:text-cream' : 'bg-cream text-ink'
-              }`}
-            >
-              {t('sizeByDimensions')}
-            </button>
-          </div>
-          <div className="flex items-end gap-2">
-            <div className="min-w-0 flex-1">
-              <NumberField
-                label={t('bytes')}
-                value={bytesField}
-                decimals={byteUnit === 'mb' ? 3 : 0}
-                live={false}
-                disabled={!isBytes}
-                onChange={(value) => {
-                  const bytes = Math.round(value * unitBytes)
-                  const tolerance = byteUnit === 'mb' ? 512 : 1024
-                  if (value <= 0 || bytes < 1) {
-                    setTargetBytes(null)
-                    return
-                  }
-                  if (targetBytes != null && Math.abs(bytes - targetBytes) <= tolerance) return
-                  if (targetBytes == null && Math.abs(bytes - outputBytes) <= tolerance) return
-                  setTargetBytes(bytes)
-                }}
+        <div className="flex h-full min-h-0 w-full min-w-0 flex-col md:min-w-[420px]">
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4 md:py-5">
+            <ControlCard title={t('fileName')} delay={70}>
+              <input
+                value={downloadStem}
+                maxLength={120}
+                spellCheck={false}
+                aria-label={t('fileName')}
+                placeholder={fileStem(source.name)}
+                onChange={(event) => setDownloadStem(event.target.value)}
+                className="h-12 rounded-2xl border border-line bg-panel px-3 text-base outline-none transition duration-200 placeholder:text-muted focus:border-accent/70"
               />
-            </div>
-            <div className={`flex h-12 shrink-0 rounded-2xl bg-panel p-1 ring-1 ring-line ${isBytes ? '' : 'opacity-40'}`}>
-              <button
-                type="button"
-                aria-pressed={byteUnit === 'kb'}
-                disabled={!isBytes}
-                onClick={() => setByteUnit('kb')}
-                className={`cursor-pointer rounded-xl px-3 text-sm font-semibold transition duration-200 disabled:cursor-not-allowed ${
-                  byteUnit === 'kb' ? 'bg-cream text-ink' : 'text-muted hover:text-cream'
-                }`}
-              >
-                KB
-              </button>
-              <button
-                type="button"
-                aria-pressed={byteUnit === 'mb'}
-                disabled={!isBytes}
-                onClick={() => setByteUnit('mb')}
-                className={`cursor-pointer rounded-xl px-3 text-sm font-semibold transition duration-200 disabled:cursor-not-allowed ${
-                  byteUnit === 'mb' ? 'bg-cream text-ink' : 'text-muted hover:text-cream'
-                }`}
-              >
-                MB
-              </button>
-            </div>
-          </div>
-          <p className="text-sm text-muted">{isBytes ? t('targetHint') : t('dimensionHint')}</p>
-          <div className="grid grid-cols-3 gap-2">
-            <NumberField label={t('width')} value={width} suffix="px" disabled={isBytes} onChange={setWidth} />
-            <NumberField label={t('height')} value={height} suffix="px" disabled={isBytes} onChange={setHeight} />
-            <NumberField label={t('scale')} value={scale} suffix="%" allowDecimal disabled={isBytes} onChange={setScale} />
-          </div>
-        </div>
-      </ControlCard>
-      </div>
+            </ControlCard>
 
-      <div className="flex shrink-0 flex-col gap-2.5 border-t border-line bg-panel px-5 py-4">
-        {error ? <p className="text-sm text-accent">{errorText(t, error)}</p> : null}
-        {status === 'error' ? (
-          <button type="button" onClick={retry} className="h-10 cursor-pointer rounded-full border border-line text-sm font-medium">
-            {t('retry')}
-          </button>
-        ) : null}
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            aria-haspopup="dialog"
-            aria-expanded={isPresetOpen}
-            onClick={() => setIsPresetOpen(true)}
-            className="h-10 cursor-pointer rounded-full border border-line bg-sunken text-sm font-medium transition duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
-          >
-            {t('loadSettings')}
-            {presets.length > 0 ? <span className="ml-1.5 text-muted">{presets.length}</span> : null}
-          </button>
-          <button
-            type="button"
-            onClick={saveCurrent}
-            className="h-10 cursor-pointer rounded-full border border-line bg-sunken text-sm font-semibold transition duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
-          >
-            {t('saveSettings')}
-          </button>
+            <ControlCard title={t('format')} delay={140}>
+              <div className="grid grid-cols-3 gap-2">
+                {FORMATS.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    aria-pressed={format === item}
+                    onClick={() => setFormat(cycleChoice(format, item, FORMATS))}
+                    className={`h-12 cursor-pointer rounded-2xl text-base font-semibold transition duration-200 active:scale-[0.97] ${
+                      format === item
+                        ? 'bg-cream text-ink shadow-[0_8px_24px_rgba(0,0,0,0.12)]'
+                        : 'bg-panel text-cream hover:-translate-y-0.5 hover:bg-cream/10'
+                    }`}
+                  >
+                    {FORMAT_META[item].label}
+                  </button>
+                ))}
+              </div>
+            </ControlCard>
+
+            <ControlCard
+              title={t('quality')}
+              delay={210}
+              extra={
+                format === 'png' ? null : (
+                  <span className="text-3xl font-semibold tabular-nums leading-none">{quality}%</span>
+                )
+              }
+            >
+              {format === 'png' ? (
+                <p className="rounded-2xl bg-panel px-4 py-3 text-sm text-muted">{t('pngLossless')}</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-4 gap-2">
+                    {QUALITY_PRESETS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        aria-pressed={quality === preset.value}
+                        onClick={() => setQuality(cycleChoice(quality, preset.value, QUALITY_VALUES))}
+                        className={`h-11 cursor-pointer rounded-xl text-sm font-semibold transition duration-200 active:scale-[0.97] ${
+                          quality === preset.value ? 'bg-cream text-ink' : 'bg-panel text-muted hover:-translate-y-0.5 hover:text-cream'
+                        }`}
+                      >
+                        {t(preset.id)}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={100}
+                    step={1}
+                    value={quality}
+                    aria-label={t('quality')}
+                    aria-valuetext={`${quality}%`}
+                    onChange={(event) => setQuality(Number(event.target.value))}
+                    className="quality-slider mt-1"
+                    style={{
+                      backgroundImage: `linear-gradient(to right, var(--accent) ${quality}%, var(--line) ${quality}%)`,
+                    }}
+                  />
+                </>
+              )}
+            </ControlCard>
+
+            <ControlCard
+              title={t('size')}
+              delay={280}
+              extra={
+                isBytes ? null : (
+                  <button
+                    type="button"
+                    onClick={resetSize}
+                    disabled={isOriginalSize}
+                    className="h-8 cursor-pointer rounded-full px-2 text-sm text-muted transition hover:text-cream disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {t('resetSize')}
+                  </button>
+                )
+              }
+            >
+              <div className="flex flex-col gap-3">
+                <div className="grid grid-cols-2 gap-1 rounded-2xl bg-panel p-1 ring-1 ring-line">
+                  <button
+                    type="button"
+                    aria-pressed={isBytes}
+                    onClick={() => setSizeMode('bytes')}
+                    className={`h-10 cursor-pointer rounded-xl text-sm font-semibold transition duration-200 ${
+                      isBytes ? 'bg-cream text-ink' : 'text-muted hover:text-cream'
+                    }`}
+                  >
+                    {t('bytes')}
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={!isBytes}
+                    onClick={() => setSizeMode('dimensions')}
+                    className={`h-10 cursor-pointer rounded-xl text-sm font-semibold transition duration-200 ${
+                      isBytes ? 'text-muted hover:text-cream' : 'bg-cream text-ink'
+                    }`}
+                  >
+                    {t('sizeByDimensions')}
+                  </button>
+                </div>
+                <div className="flex items-end gap-2">
+                  <div className="min-w-0 flex-1">
+                    <NumberField
+                      label={t('bytes')}
+                      value={bytesField}
+                      decimals={byteUnit === 'mb' ? 3 : 0}
+                      live={false}
+                      disabled={!isBytes}
+                      onChange={commitBytes}
+                    />
+                  </div>
+                  <div className={`flex h-12 shrink-0 rounded-2xl bg-panel p-1 ring-1 ring-line ${isBytes ? '' : 'opacity-40'}`}>
+                    <button
+                      type="button"
+                      aria-pressed={byteUnit === 'kb'}
+                      disabled={!isBytes}
+                      onClick={() => setByteUnit('kb')}
+                      className={`cursor-pointer rounded-xl px-3 text-sm font-semibold transition duration-200 disabled:cursor-not-allowed ${
+                        byteUnit === 'kb' ? 'bg-cream text-ink' : 'text-muted hover:text-cream'
+                      }`}
+                    >
+                      KB
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={byteUnit === 'mb'}
+                      disabled={!isBytes}
+                      onClick={() => setByteUnit('mb')}
+                      className={`cursor-pointer rounded-xl px-3 text-sm font-semibold transition duration-200 disabled:cursor-not-allowed ${
+                        byteUnit === 'mb' ? 'bg-cream text-ink' : 'text-muted hover:text-cream'
+                      }`}
+                    >
+                      MB
+                    </button>
+                  </div>
+                </div>
+                <p className="text-sm text-muted">{isBytes ? t('targetHint') : t('dimensionHint')}</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <NumberField label={t('width')} value={width} suffix="px" disabled={isBytes} onChange={setWidth} />
+                  <NumberField label={t('height')} value={height} suffix="px" disabled={isBytes} onChange={setHeight} />
+                  <NumberField label={t('scale')} value={scale} suffix="%" allowDecimal disabled={isBytes} onChange={setScale} />
+                </div>
+              </div>
+            </ControlCard>
+          </div>
+
+          <div className="flex shrink-0 flex-col gap-2.5 border-t border-line bg-panel px-5 py-4">
+            {error ? <p className="text-sm text-accent">{errorMessage(locale, error)}</p> : null}
+            {status === 'error' ? (
+              <button type="button" onClick={retry} className="h-10 cursor-pointer rounded-full border border-line text-sm font-medium">
+                {t('retry')}
+              </button>
+            ) : null}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                aria-expanded={isPresetOpen}
+                onClick={() => setIsPresetOpen(true)}
+                className="h-10 cursor-pointer rounded-full border border-line bg-sunken text-sm font-medium transition duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
+              >
+                {t('loadSettings')}
+                {presets.length > 0 ? <span className="ml-1.5 text-muted">{presets.length}</span> : null}
+              </button>
+              <button
+                type="button"
+                onClick={saveCurrent}
+                className="h-10 cursor-pointer rounded-full border border-line bg-sunken text-sm font-semibold transition duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
+              >
+                {t('saveSettings')}
+              </button>
+            </div>
+            <button
+              type="button"
+              disabled={!canDownload}
+              onClick={download}
+              className={`h-11 cursor-pointer rounded-full bg-accent text-sm font-semibold text-on-accent transition duration-200 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-40 ${
+                status === 'encoding' ? 'cursor-wait' : 'disabled:cursor-not-allowed'
+              }`}
+            >
+              {status === 'encoding' ? t('encoding') : t('download')}
+            </button>
+          </div>
+          {isPresetOpen ? <PresetDialog onClose={closePresets} /> : null}
+          {toast ? <SaveToast tone={toast.tone} message={toast.tone === 'limit' ? t('presetLimit') : t('presetSaved')} /> : null}
         </div>
-        <button
-          type="button"
-          disabled={!canDownload}
-          onClick={() => {
-            if (!result) return
-            const typed = downloadStem.trim()
-            const anchor = document.createElement('a')
-            anchor.href = result.url
-            anchor.download = downloadName(typed || source.name, result.format)
-            anchor.click()
-          }}
-          className={`h-11 cursor-pointer rounded-full bg-accent text-sm font-semibold text-on-accent transition duration-200 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-40 ${
-            status === 'encoding' ? 'cursor-wait' : 'disabled:cursor-not-allowed'
-          }`}
-        >
-          {status === 'encoding' ? t('encoding') : t('download')}
-        </button>
-      </div>
-      {isPresetOpen ? <PresetDialog onClose={closePresets} /> : null}
-      {toast ? <SaveToast tone={toast.tone} message={toast.tone === 'limit' ? t('presetLimit') : t('presetSaved')} /> : null}
-      </div>
       </div>
       <button
         type="button"
@@ -348,6 +335,11 @@ export function Controls() {
       </button>
     </aside>
   )
+}
+
+function panelClass(isOpen: boolean) {
+  const size = isOpen ? 'min-h-0 w-full flex-1 md:w-[420px] md:flex-none' : 'h-12 w-full flex-none md:w-12'
+  return `relative border-t border-line bg-panel transition-[width,height] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none md:h-full md:border-t-0 md:border-l ${size}`
 }
 
 function ControlCard({
@@ -378,7 +370,7 @@ function ControlCard({
   )
 }
 
-function SaveToast({ tone, message }: { tone: 'saved' | 'limit'; message: string }) {
+function SaveToast({ tone, message }: { tone: ToastTone; message: string }) {
   return createPortal(
     <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[60] flex justify-center px-4">
       <p
@@ -392,9 +384,4 @@ function SaveToast({ tone, message }: { tone: 'saved' | 'limit'; message: string
     </div>,
     document.body,
   )
-}
-
-function fileStem(fileName: string) {
-  const stem = fileName.replace(/\.[^.]+$/, '').trim()
-  return stem || fileName
 }

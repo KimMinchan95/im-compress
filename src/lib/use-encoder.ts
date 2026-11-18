@@ -70,13 +70,14 @@ export function useEncoder() {
       void (async () => {
         try {
           const latest = useEditorStore.getState()
-          if (!latest.source) return
+          const image = latest.source
+          if (!image) return
           if (latest.targetBytes != null) {
             const matched = await matchBytes(
               (attempt) =>
                 encodeOnce(
                   {
-                    source: latest.source!.blob,
+                    source: image.blob,
                     format: latest.format,
                     quality: attempt.quality,
                     width: attempt.width,
@@ -85,8 +86,8 @@ export function useEncoder() {
                   isCancelled,
                 ),
               {
-                sourceWidth: latest.source.width,
-                sourceHeight: latest.source.height,
+                sourceWidth: image.width,
+                sourceHeight: image.height,
                 quality: latest.quality,
                 targetBytes: latest.targetBytes,
               },
@@ -110,7 +111,13 @@ export function useEncoder() {
           }
 
           const blob = await encodeOnce(
-            { source: latest.source.blob, format: latest.format, quality: latest.quality, width: latest.width, height: latest.height },
+            {
+              source: image.blob,
+              format: latest.format,
+              quality: latest.quality,
+              width: latest.width,
+              height: latest.height,
+            },
             isCancelled,
           )
           if (cancelled) return

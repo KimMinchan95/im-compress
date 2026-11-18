@@ -29,6 +29,8 @@ function createId() {
   return `${Date.now()}-${Math.round(Math.random() * 10000)}`
 }
 
+type PresetDraft = Pick<SavedPreset, 'format' | 'quality' | 'scale' | 'sizeMode' | 'targetBytes'>
+
 export function presetName(
   format: OutputFormat,
   quality: number,
@@ -38,12 +40,20 @@ export function presetName(
 ) {
   const label = FORMAT_META[format].label
   if (sizeMode === 'bytes') {
-    const size = targetBytes ? formatBytes(targetBytes) : label
     if (format === 'png') return targetBytes ? `${label} · ${formatBytes(targetBytes)}` : label
-    return targetBytes ? `${label} ${quality}% · ${size}` : `${label} ${quality}%`
+    const qualityLabel = `${label} ${quality}%`
+    return targetBytes ? `${qualityLabel} · ${formatBytes(targetBytes)}` : qualityLabel
   }
   if (format === 'png') return `${label} · ${scale}%`
   return `${label} ${quality}% · ${scale}%`
+}
+
+export function isSamePreset(preset: SavedPreset, draft: PresetDraft) {
+  if (preset.format !== draft.format || preset.quality !== draft.quality || preset.sizeMode !== draft.sizeMode) {
+    return false
+  }
+  if (draft.sizeMode === 'bytes') return preset.targetBytes === draft.targetBytes
+  return preset.scale === draft.scale
 }
 
 function sizeModeOf(preset: Partial<SavedPreset>): SizeMode {

@@ -1,9 +1,9 @@
 import { create } from 'zustand'
 import { sizeFromHeight, sizeFromScale, sizeFromWidth } from '../lib/aspect'
 import { formatFromFile, isSupportedFile } from '../lib/files'
+import type { CompareMode, EditorErrorCode, EncodeResult, EncodeStatus, OutputFormat, SizeMode, SourceImage } from '../types'
 import { usePresets } from './preset-store'
 import { useStageStore } from './stage-store'
-import type { CompareMode, EditorErrorCode, EncodeResult, EncodeStatus, OutputFormat, SizeMode, SourceImage } from '../types'
 
 const DEFAULT_QUALITY = 80
 
@@ -58,6 +58,15 @@ function releaseLater(url: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
+function releaseMedia(current: { source: SourceImage | null; result: EncodeResult | null }) {
+  if (current.source) releaseLater(current.source.url)
+  if (current.result) releaseLater(current.result.url)
+}
+
+function clampQuality(quality: number) {
+  return Math.min(100, Math.max(1, Math.round(quality)))
+}
+
 export const useEditorStore = create<EditorStore>((set, get) => ({
   source: null,
   format: 'jpeg',
@@ -93,8 +102,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
       const fitted = sizeFromWidth(width, height, width)
       const current = get()
-      if (current.source) releaseLater(current.source.url)
-      if (current.result) releaseLater(current.result.url)
+      releaseMedia(current)
       const { presets, defaultId } = usePresets.getState()
       const preset = presets.find((item) => item.id === defaultId) ?? null
       const sized =
@@ -133,12 +141,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
   setFormat: (format) => set({ format, matchedTarget: null }),
 
-  setQuality: (quality) => {
-    set({
-      quality: Math.min(100, Math.max(1, Math.round(quality))),
-      matchedTarget: null,
-    })
-  },
+  setQuality: (quality) => set({ quality: clampQuality(quality), matchedTarget: null }),
 
   setWidth: (width) => {
     const source = get().source
@@ -184,7 +187,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         : sizeFromWidth(source.width, source.height, source.width)
     set({
       format,
-      quality: Math.min(100, Math.max(1, Math.round(quality))),
+      quality: clampQuality(quality),
       ...sized,
       sizeMode,
       targetBytes: bytes,
@@ -199,9 +202,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   },
 
   leave: () => {
-    const current = get()
-    if (current.source) releaseLater(current.source.url)
-    if (current.result) releaseLater(current.result.url)
+    releaseMedia(get())
     set({
       source: null,
       result: null,

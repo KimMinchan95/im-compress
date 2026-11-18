@@ -1,13 +1,20 @@
 import type { ComponentType } from 'react'
+import { FILE_ACCEPT, takeFile } from '../lib/files'
+import { errorMessage } from '../lib/error-message'
 import { useI18n } from '../lib/use-i18n'
 import { useEditorStore } from '../store/editor-store'
-import type { EditorErrorCode } from '../types'
 import { GithubIcon, InstagramIcon, MailIcon } from './icons'
 
-const ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp'
 const FORMATS = ['JPG', 'PNG', 'WebP']
 
-const LINKS: { href: string; label: 'github' | 'email' | 'instagram'; icon: ComponentType<{ className?: string }>; external?: boolean }[] = [
+interface ContactLink {
+  href: string
+  label: 'github' | 'email' | 'instagram'
+  icon: ComponentType<{ className?: string }>
+  external?: boolean
+}
+
+const LINKS: ContactLink[] = [
   { href: 'mailto:hialscks@gmail.com', label: 'email', icon: MailIcon },
   { href: 'https://github.com/KimMinchan95', label: 'github', icon: GithubIcon, external: true },
   { href: 'https://www.instagram.com/chan_pest/', label: 'instagram', icon: InstagramIcon, external: true },
@@ -17,7 +24,7 @@ export function DropZone() {
   const error = useEditorStore((state) => state.error)
   const isReading = useEditorStore((state) => state.isReading)
   const loadFile = useEditorStore((state) => state.loadFile)
-  const { t } = useI18n()
+  const { locale, t } = useI18n()
 
   return (
     <main className="relative flex flex-1 items-center justify-center overflow-hidden px-5 py-8">
@@ -72,11 +79,10 @@ export function DropZone() {
             <label className="drop-face">
               <input
                 type="file"
-                accept={ACCEPT}
+                accept={FILE_ACCEPT}
                 className="sr-only"
                 onChange={(event) => {
-                  const file = event.target.files?.[0]
-                  event.currentTarget.value = ''
+                  const file = takeFile(event.currentTarget)
                   if (file) void loadFile(file)
                 }}
               />
@@ -89,12 +95,17 @@ export function DropZone() {
           </div>
         </div>
       </div>
-      {error ? <p className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 text-sm text-accent">{errorText(t, error)}</p> : null}
+      {error ? <p className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 text-sm text-accent">{errorMessage(locale, error)}</p> : null}
     </main>
   )
 }
 
-function CompareShowcase({ original, compressed }: { original: string; compressed: string }) {
+interface CompareShowcaseProps {
+  original: string
+  compressed: string
+}
+
+function CompareShowcase({ original, compressed }: CompareShowcaseProps) {
   return (
     <div className="showcase rise" style={{ animationDelay: '140ms' }} aria-hidden="true">
       <div className="showcase-photo">
@@ -111,14 +122,3 @@ function CompareShowcase({ original, compressed }: { original: string; compresse
     </div>
   )
 }
-
-export function errorText(
-  t: ReturnType<typeof useI18n>['t'],
-  error: EditorErrorCode,
-) {
-  if (error === 'unsupported') return t('unsupported')
-  if (error === 'unreadable') return t('unreadable')
-  return t('encodeFailed')
-}
-
-export { ACCEPT }

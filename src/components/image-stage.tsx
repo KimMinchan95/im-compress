@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { cycleChoice } from '../lib/cycle-choice'
 import { useI18n } from '../lib/use-i18n'
 import { useEditorStore } from '../store/editor-store'
-import { clampZoom, useStageStore } from '../store/stage-store'
+import { MAX_ZOOM, MIN_ZOOM, clampZoom, useStageStore } from '../store/stage-store'
 import type { CompareMode } from '../types'
 import { ExpandIcon } from './icons'
 
@@ -24,6 +24,9 @@ interface ZoomAnchor {
 }
 
 const COMPARE_MODES = ['original', 'result', 'split'] as const
+const ZOOM_STEP = 1.2
+const SPLIT_LABEL =
+  'pointer-events-none absolute z-20 whitespace-nowrap rounded-full bg-[#100f0d]/75 px-2.5 py-1 text-xs font-medium text-[#f6f1e7]'
 
 function contain(width: number, height: number, maxWidth: number, maxHeight: number) {
   if (width < 1 || height < 1 || maxWidth < 1 || maxHeight < 1) return { w: 0, h: 0 }
@@ -238,11 +241,11 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center rounded-full bg-sunken p-1 ring-1 ring-line">
-            <ToolButton label={t('zoomOut')} disabled={zoom <= 0.25} onClick={() => zoomBy(1 / 1.2)}>
+            <ToolButton label={t('zoomOut')} disabled={zoom <= MIN_ZOOM} onClick={() => zoomBy(1 / ZOOM_STEP)}>
               −
             </ToolButton>
             <span className="w-12 text-center text-xs font-semibold tabular-nums">{Math.round(zoom * 100)}%</span>
-            <ToolButton label={t('zoomIn')} disabled={zoom >= 8} onClick={() => zoomBy(1.2)}>
+            <ToolButton label={t('zoomIn')} disabled={zoom >= MAX_ZOOM} onClick={() => zoomBy(ZOOM_STEP)}>
               +
             </ToolButton>
           </div>
@@ -260,124 +263,120 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
       </div>
 
       <div ref={shellRef} className="relative min-h-0 w-full flex-1">
-      <div ref={viewportRef} className="absolute inset-0 overflow-auto overscroll-contain">
-        {shownW > 0 ? (
-          <div className="flex min-h-full min-w-full items-center justify-center">
-            <div
-              ref={frameRef}
-              className={`checker relative shrink-0 overflow-hidden ring-1 ring-line select-none ${
-                mode === 'split' || zoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
-              }`}
-              style={{ width: shownW, height: shownH }}
-              onClick={() => {
-                if (movedRef.current) {
+        <div ref={viewportRef} className="absolute inset-0 overflow-auto overscroll-contain">
+          {shownW > 0 ? (
+            <div className="flex min-h-full min-w-full items-center justify-center">
+              <div
+                ref={frameRef}
+                className={`checker relative shrink-0 overflow-hidden ring-1 ring-line select-none ${
+                  mode === 'split' || zoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
+                }`}
+                style={{ width: shownW, height: shownH }}
+                onClick={() => {
+                  if (movedRef.current) {
+                    movedRef.current = false
+                    return
+                  }
+                  if (mode === 'split' || !resultUrl) return
+                  setCompareMode(mode === 'original' ? 'result' : 'original')
+                }}
+                onPointerDown={(event) => {
+                  if ((event.target as HTMLElement).closest('[data-slider]')) return
+                  if (event.button !== 0 && event.button !== 1) return
+                  const panning = event.button === 1 || spaceRef.current || mode === 'split' || zoom > 1
+                  if (!panning) return
+                  const viewport = viewportRef.current
+                  if (!viewport) return
                   movedRef.current = false
-                  return
-                }
-                if (mode === 'split' || !resultUrl) return
-                setCompareMode(mode === 'original' ? 'result' : 'original')
-              }}
-              onPointerDown={(event) => {
-                if ((event.target as HTMLElement).closest('[data-slider]')) return
-                if (event.button !== 0 && event.button !== 1) return
-                const panning = event.button === 1 || spaceRef.current || mode === 'split' || zoom > 1
-                if (!panning) return
-                const viewport = viewportRef.current
-                if (!viewport) return
-                movedRef.current = false
-                panRef.current = {
-                  x: event.clientX,
-                  y: event.clientY,
-                  left: viewport.scrollLeft,
-                  top: viewport.scrollTop,
-                }
-                event.currentTarget.setPointerCapture(event.pointerId)
-              }}
-              onPointerMove={(event) => {
-                if (!panRef.current || !viewportRef.current) return
-                const dx = event.clientX - panRef.current.x
-                const dy = event.clientY - panRef.current.y
-                if (Math.hypot(dx, dy) > 4) movedRef.current = true
-                viewportRef.current.scrollLeft = panRef.current.left - dx
-                viewportRef.current.scrollTop = panRef.current.top - dy
-              }}
-              onPointerUp={() => {
-                panRef.current = null
-              }}
-            >
-              {resultUrl ? (
+                  panRef.current = {
+                    x: event.clientX,
+                    y: event.clientY,
+                    left: viewport.scrollLeft,
+                    top: viewport.scrollTop,
+                  }
+                  event.currentTarget.setPointerCapture(event.pointerId)
+                }}
+                onPointerMove={(event) => {
+                  if (!panRef.current || !viewportRef.current) return
+                  const dx = event.clientX - panRef.current.x
+                  const dy = event.clientY - panRef.current.y
+                  if (Math.hypot(dx, dy) > 4) movedRef.current = true
+                  viewportRef.current.scrollLeft = panRef.current.left - dx
+                  viewportRef.current.scrollTop = panRef.current.top - dy
+                }}
+                onPointerUp={() => {
+                  panRef.current = null
+                }}
+              >
+                {resultUrl ? (
+                  <img
+                    src={resultUrl}
+                    alt={mode === 'result' ? t('altCompressed') : ''}
+                    draggable={false}
+                    className={`pointer-events-none absolute inset-0 h-full w-full object-contain transition-opacity duration-300 ${
+                      mode === 'original' ? 'opacity-0' : 'opacity-100'
+                    }`}
+                  />
+                ) : null}
                 <img
-                  src={resultUrl}
-                  alt={mode === 'result' ? t('altCompressed') : ''}
+                  ref={originalRef}
+                  src={originalUrl}
+                  alt={mode === 'result' ? '' : t('altOriginal')}
                   draggable={false}
                   className={`pointer-events-none absolute inset-0 h-full w-full object-contain transition-opacity duration-300 ${
-                    mode === 'original' ? 'opacity-0' : 'opacity-100'
+                    mode === 'result' ? 'opacity-0' : 'opacity-100'
                   }`}
                 />
-              ) : null}
-              <img
-                ref={originalRef}
-                src={originalUrl}
-                alt={mode === 'result' ? '' : t('altOriginal')}
-                draggable={false}
-                className={`pointer-events-none absolute inset-0 h-full w-full object-contain transition-opacity duration-300 ${
-                  mode === 'result' ? 'opacity-0' : 'opacity-100'
-                }`}
-              />
+              </div>
             </div>
+          ) : null}
+        </div>
+        {mode === 'split' ? (
+          <div
+            data-slider=""
+            role="slider"
+            tabIndex={0}
+            aria-label={t('splitPosition')}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(split)}
+            aria-valuetext={`${Math.round(split)}%`}
+            className="absolute inset-y-0 z-30 w-3 -translate-x-1/2 cursor-ew-resize touch-none outline-none"
+            style={{ left: `${split}%` }}
+            onPointerDown={(event) => {
+              event.stopPropagation()
+              event.currentTarget.setPointerCapture(event.pointerId)
+              moveSplit(event.clientX)
+            }}
+            onPointerMove={(event) => {
+              if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
+              moveSplit(event.clientX)
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'ArrowLeft') {
+                event.preventDefault()
+                setSplit(split - 2)
+              }
+              if (event.key === 'ArrowRight') {
+                event.preventDefault()
+                setSplit(split + 2)
+              }
+            }}
+          >
+            <span className="pointer-events-none absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.25)]" />
+            <span className="pointer-events-none absolute top-1/2 left-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.35)]" />
+            <span className={`${SPLIT_LABEL} ${split < 16 ? 'top-2 left-full ml-2' : 'top-2 right-full mr-2'}`}>
+              {t('original')}
+            </span>
+            <span
+              className={`${SPLIT_LABEL} ${
+                split > 84 ? 'top-9 right-full mr-2' : split < 16 ? 'top-9 left-full ml-2' : 'top-2 left-full ml-2'
+              }`}
+            >
+              {t('compressed')}
+            </span>
           </div>
         ) : null}
-      </div>
-      {mode === 'split' ? (
-        <div
-          data-slider=""
-          role="slider"
-          tabIndex={0}
-          aria-label={t('splitPosition')}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(split)}
-          aria-valuetext={`${Math.round(split)}%`}
-          className="absolute inset-y-0 z-30 w-3 -translate-x-1/2 cursor-ew-resize touch-none outline-none"
-          style={{ left: `${split}%` }}
-          onPointerDown={(event) => {
-            event.stopPropagation()
-            event.currentTarget.setPointerCapture(event.pointerId)
-            moveSplit(event.clientX)
-          }}
-          onPointerMove={(event) => {
-            if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
-            moveSplit(event.clientX)
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'ArrowLeft') {
-              event.preventDefault()
-              setSplit(split - 2)
-            }
-            if (event.key === 'ArrowRight') {
-              event.preventDefault()
-              setSplit(split + 2)
-            }
-          }}
-        >
-          <span className="pointer-events-none absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.25)]" />
-          <span className="pointer-events-none absolute top-1/2 left-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.35)]" />
-          <span
-            className={`pointer-events-none absolute z-20 whitespace-nowrap rounded-full bg-[#100f0d]/75 px-2.5 py-1 text-xs font-medium text-[#f6f1e7] ${
-              split < 16 ? 'top-2 left-full ml-2' : 'top-2 right-full mr-2'
-            }`}
-          >
-            {t('original')}
-          </span>
-          <span
-            className={`pointer-events-none absolute z-20 whitespace-nowrap rounded-full bg-[#100f0d]/75 px-2.5 py-1 text-xs font-medium text-[#f6f1e7] ${
-              split > 84 ? 'top-9 right-full mr-2' : split < 16 ? 'top-9 left-full ml-2' : 'top-2 left-full ml-2'
-            }`}
-          >
-            {t('compressed')}
-          </span>
-        </div>
-      ) : null}
       </div>
 
       {caption ? <p className="truncate text-center text-sm font-medium text-muted">{caption}</p> : null}
