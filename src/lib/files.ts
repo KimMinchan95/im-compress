@@ -40,6 +40,52 @@ export function downloadName(name: string, format: OutputFormat) {
   return `${base}.${FORMAT_META[format].extension}`
 }
 
+function prefersShare() {
+  return window.matchMedia('(pointer: coarse)').matches || /Android/i.test(navigator.userAgent)
+}
+
+function canShareFile(file: File) {
+  if (typeof navigator.share !== 'function' || typeof navigator.canShare !== 'function') return false
+  try {
+    return navigator.canShare({ files: [file] })
+  } catch {
+    return false
+  }
+}
+
+function shareableFile(blob: Blob, filename: string) {
+  const typed = new File([blob], filename, { type: blob.type || 'application/octet-stream' })
+  if (canShareFile(typed)) return typed
+  if (typed.type === 'application/octet-stream') return null
+  const generic = new File([blob], filename, { type: 'application/octet-stream' })
+  return canShareFile(generic) ? generic : null
+}
+
+function anchorDownload(url: string, filename: string) {
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.rel = 'noopener'
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+}
+
+export function saveFile(blob: Blob, url: string, filename: string) {
+  if (prefersShare()) {
+    const file = shareableFile(blob, filename)
+    if (file) {
+      void navigator.share({ files: [file] }).catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        anchorDownload(url, filename)
+      })
+      return
+    }
+  }
+
+  anchorDownload(url, filename)
+}
+
 export function takeFile(input: HTMLInputElement) {
   const file = input.files?.[0] ?? null
   input.value = ''

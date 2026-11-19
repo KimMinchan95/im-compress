@@ -4,7 +4,7 @@ import { sizeFromWidth } from '../lib/aspect'
 import { byteFieldValue, targetFromField, type ByteUnit } from '../lib/byte-field'
 import { cycleChoice } from '../lib/cycle-choice'
 import { errorMessage } from '../lib/error-message'
-import { FORMAT_META, FORMATS, QUALITY_PRESETS, downloadName, fileStem, isResultCurrent } from '../lib/files'
+import { FORMAT_META, FORMATS, QUALITY_PRESETS, downloadName, fileStem, isResultCurrent, saveFile } from '../lib/files'
 import { useI18n } from '../lib/use-i18n'
 import { useEditorStore } from '../store/editor-store'
 import { isSamePreset, presetName, usePresets } from '../store/preset-store'
@@ -103,10 +103,7 @@ export function Controls() {
   const download = () => {
     if (!result) return
     const typed = downloadStem.trim()
-    const anchor = document.createElement('a')
-    anchor.href = result.url
-    anchor.download = downloadName(typed || source.name, result.format)
-    anchor.click()
+    saveFile(result.blob, result.url, downloadName(typed || source.name, result.format))
   }
 
   const commitBytes = (value: number) => {

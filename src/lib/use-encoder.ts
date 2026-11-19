@@ -96,6 +96,7 @@ export function useEncoder() {
             applyMatched({
               result: {
                 url: URL.createObjectURL(matched.blob),
+                blob: matched.blob,
                 bytes: matched.bytes,
                 width: matched.width,
                 height: matched.height,
@@ -123,6 +124,7 @@ export function useEncoder() {
           if (cancelled) return
           applyResult({
             url: URL.createObjectURL(blob),
+            blob,
             bytes: blob.size,
             width: latest.width,
             height: latest.height,
