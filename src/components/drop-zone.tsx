@@ -26,11 +26,8 @@ export function DropZone() {
   const { locale, t } = useI18n()
 
   return (
-    <main className="relative flex flex-1 flex-col overflow-x-hidden px-5 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:items-center md:justify-center md:overflow-hidden md:py-8">
-      <div className="orb orb-a" />
-      <div className="orb orb-b" />
-      <div className="orb orb-c" />
-      <div className="relative z-10 flex w-full max-w-6xl flex-col gap-6 md:grid md:grid-cols-[1.05fr_0.95fr] md:items-center md:gap-8">
+    <main className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-5 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-10 md:py-8">
+      <div className="relative z-10 mx-auto my-auto grid w-full max-w-6xl grid-cols-1 items-center gap-6 md:grid-cols-2 md:gap-16">
         <div className="contents md:flex md:flex-col md:justify-center">
           <div className="order-1 text-center md:order-none md:text-left">
             <p className="rise flex items-center justify-center gap-2 text-xs font-semibold tracking-[0.22em] text-accent md:justify-start">
@@ -76,7 +73,7 @@ export function DropZone() {
           </div>
         </div>
         <div className="contents md:flex md:flex-col md:items-center md:gap-5">
-          <div className="order-3 md:order-none">
+          <div className="order-3 w-full max-w-md md:order-none">
             <CompareShowcase original={t('original')} compressed={t('compressed')} />
           </div>
           <div className="drop-shell rise order-2 w-full max-w-md md:order-none" style={{ animationDelay: '260ms' }}>

@@ -338,29 +338,29 @@ body {
 }
 
 .orb-a {
-    top: -4rem;
-    left: -6rem;
-    width: 28rem;
-    height: 28rem;
-    background: color-mix(in srgb, var(--accent) 48%, transparent);
+    top: -10rem;
+    left: -8rem;
+    width: 36rem;
+    height: 36rem;
+    background: color-mix(in srgb, var(--accent) 42%, transparent);
     animation: drift-a 16s ease-in-out infinite;
 }
 
 .orb-b {
-    right: -7rem;
-    bottom: -5rem;
-    width: 26rem;
-    height: 26rem;
-    background: color-mix(in srgb, #ffb25e 42%, transparent);
+    right: -12rem;
+    bottom: -12rem;
+    width: 40rem;
+    height: 40rem;
+    background: color-mix(in srgb, #ffb25e 36%, transparent);
     animation: drift-b 18s ease-in-out infinite;
 }
 
 .orb-c {
-    top: 18%;
-    left: 42%;
-    width: 16rem;
-    height: 16rem;
-    background: color-mix(in srgb, var(--accent) 28%, transparent);
+    top: 30%;
+    left: calc(50% - 14rem);
+    width: 28rem;
+    height: 28rem;
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
     animation: drift-c 13s ease-in-out infinite;
 }
 
@@ -424,7 +424,9 @@ body {
 }
 
 .showcase {
-    width: min(100%, 28rem);
+    width: 100%;
+    max-width: 28rem;
+    margin-inline: auto;
 }
 
 .showcase-photo {

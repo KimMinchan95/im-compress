@@ -47,12 +47,19 @@ export default function App() {
 
   return (
     <div
-      className="relative min-h-dvh overflow-x-hidden bg-ink font-sans text-cream"
+      className="relative flex h-dvh flex-col overflow-hidden bg-ink font-sans text-cream"
       {...dropHandlers}
     >
       <ThemeSync />
       <EncodeBridge />
-      <div className={`mx-auto flex max-w-[1440px] flex-col ${hasSource ? 'h-dvh overflow-hidden' : 'min-h-dvh'}`}>
+      {hasSource ? null : (
+        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+          <div className="orb orb-a" />
+          <div className="orb orb-b" />
+          <div className="orb orb-c" />
+        </div>
+      )}
+      <div className={`relative z-10 mx-auto flex h-full w-full flex-col ${hasSource ? 'max-w-[1440px]' : ''}`}>
         <Header />
         {isKakaoTalk() ? (
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-sunken px-4 py-2.5 md:px-8">
