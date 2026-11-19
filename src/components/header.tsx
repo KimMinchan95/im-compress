@@ -17,7 +17,7 @@ export function Header() {
   const nextLocale = locale === 'ko' ? 'en' : 'ko'
 
   return (
-    <header className="flex shrink-0 items-center justify-between gap-2 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 md:px-8 md:pt-[max(1rem,env(safe-area-inset-top))] md:pb-4">
+    <header className="flex shrink-0 items-center justify-between gap-2 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 md:pt-[max(1rem,env(safe-area-inset-top))] md:pb-4">
       <div className="flex min-w-0 items-center gap-2.5">
         {hasSource ? (
           <button

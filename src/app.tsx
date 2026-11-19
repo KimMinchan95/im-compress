@@ -59,7 +59,7 @@ export default function App() {
           <div className="orb orb-c" />
         </div>
       )}
-      <div className={`relative z-10 mx-auto flex h-full w-full flex-col ${hasSource ? 'max-w-[1440px]' : ''}`}>
+      <div className="relative z-10 mx-auto flex h-full w-full flex-col">
         <Header />
         {isKakaoTalk() ? (
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-sunken px-4 py-2.5 md:px-8">
