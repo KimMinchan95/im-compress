@@ -1,5 +1,4 @@
 import type { EncodeResult, OutputFormat } from '../types'
-import { directDownloadUrl } from './download-bridge'
 
 export const FORMAT_META: Record<OutputFormat, { label: string; mime: string; extension: string }> = {
   jpeg: { label: 'JPG', mime: 'image/jpeg', extension: 'jpg' },
@@ -66,9 +65,20 @@ const IMAGE_MIME = new Set(Object.values(FORMAT_META).map((meta) => meta.mime))
 
 export type SaveOutcome = 'saved' | 'cancelled' | 'failed' | 'started'
 
-function shareImage(blob: Blob, filename: string, mime: string) {
-  if (typeof navigator.share !== 'function' || !IMAGE_MIME.has(mime)) return Promise.resolve<SaveOutcome>('failed')
+function shareableFile(blob: Blob, filename: string, mime: string) {
+  if (typeof navigator.share !== 'function' || !IMAGE_MIME.has(mime)) return null
   const file = new File([blob], filename, { type: mime })
+  if (typeof navigator.canShare !== 'function') return file
+  try {
+    return navigator.canShare({ files: [file] }) ? file : null
+  } catch {
+    return null
+  }
+}
+
+function shareImage(blob: Blob, filename: string, mime: string) {
+  const file = shareableFile(blob, filename, mime)
+  if (!file) return Promise.resolve<SaveOutcome>('failed')
   return navigator.share({ files: [file] }).then(
     () => 'saved' as const,
     (error: unknown) => (error instanceof DOMException && error.name === 'AbortError' ? 'cancelled' : 'failed'),
@@ -84,7 +94,6 @@ function anchorDownload(url: string, filename: string, removeAfter = 0) {
   const anchor = document.createElement('a')
   anchor.href = url
   anchor.download = filename
-  anchor.rel = 'noopener'
   document.body.appendChild(anchor)
   anchor.click()
   if (removeAfter > 0) window.setTimeout(() => anchor.remove(), removeAfter)
@@ -105,34 +114,32 @@ function blobToDataUrl(blob: Blob) {
   })
 }
 
-function saveOnAndroid(blob: Blob, url: string, filename: string, mime: string): Promise<SaveOutcome> {
-  const direct = directDownloadUrl(filename)
-  if (direct) {
-    anchorDownload(direct, filename)
-    return Promise.resolve('started')
-  }
-  if (typeof navigator.share === 'function' && IMAGE_MIME.has(mime)) return shareImage(blob, filename, mime)
-  anchorDownload(url, filename)
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  anchorDownload(url, filename, 60_000)
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+}
+
+function saveOnAndroid(blob: Blob, filename: string, mime: string): Promise<SaveOutcome> {
+  if (shareableFile(blob, filename, mime)) return shareImage(blob, filename, mime)
+  downloadBlob(blob, filename)
   return Promise.resolve('started')
 }
 
-async function saveInKakao(blob: Blob, url: string, filename: string, mime: string): Promise<SaveOutcome> {
-  if (isIos()) {
-    if (blob.size > KAKAO_DATA_URL_LIMIT) return 'failed'
-    try {
-      anchorDownload(await blobToDataUrl(blob), filename, 1500)
-      return 'started'
-    } catch {
-      return 'failed'
-    }
+async function saveInKakao(blob: Blob, filename: string): Promise<SaveOutcome> {
+  if (!isIos()) return 'failed'
+  if (blob.size > KAKAO_DATA_URL_LIMIT) return 'failed'
+  try {
+    anchorDownload(await blobToDataUrl(blob), filename, 1500)
+    return 'started'
+  } catch {
+    return 'failed'
   }
-
-  return saveOnAndroid(blob, url, filename, mime)
 }
 
 export function saveFile(blob: Blob, url: string, filename: string, mime: string): Promise<SaveOutcome> {
-  if (isKakaoTalk()) return saveInKakao(blob, url, filename, mime)
-  if (isAndroid()) return saveOnAndroid(blob, url, filename, mime)
+  if (isKakaoTalk()) return saveInKakao(blob, filename)
+  if (isAndroid()) return saveOnAndroid(blob, filename, mime)
   if (isIos()) return shareImage(blob, filename, mime)
 
   anchorDownload(url, filename)

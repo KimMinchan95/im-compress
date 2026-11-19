@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom'
+import { isKakaoTalk } from '../lib/files'
 import { useI18n } from '../lib/use-i18n'
 
 export function SaveImageSheet({
@@ -32,13 +33,15 @@ export function SaveImageSheet({
         />
       </div>
       <div className="shrink-0 px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        <button
-          type="button"
-          onClick={onDownload}
-          className="h-11 w-full cursor-pointer rounded-full bg-accent text-sm font-semibold text-on-accent transition duration-200 active:scale-[0.98]"
-        >
-          {t('download')}
-        </button>
+        {isKakaoTalk() ? null : (
+          <button
+            type="button"
+            onClick={onDownload}
+            className="h-11 w-full cursor-pointer rounded-full bg-accent text-sm font-semibold text-on-accent transition duration-200 active:scale-[0.98]"
+          >
+            {t('download')}
+          </button>
+        )}
       </div>
     </div>,
     document.body,

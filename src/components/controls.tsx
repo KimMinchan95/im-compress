@@ -130,13 +130,7 @@ export function Controls() {
           setToast({ tone: 'saved', id: Date.now(), message: t('downloadStarted') })
           return
         }
-        if (outcome === 'failed') {
-          if (isKakaoTalk()) {
-            setIsImageOpen(true)
-            return
-          }
-          setToast({ tone: 'saved', id: Date.now(), message: t('imageSaveHint'), long: true })
-        }
+        if (outcome === 'failed') setIsImageOpen(true)
       },
     )
   }
