@@ -72,7 +72,7 @@ function isIos() {
 
 const IMAGE_MIME = new Set(Object.values(FORMAT_META).map((meta) => meta.mime))
 
-export type SaveOutcome = 'saved' | 'cancelled' | 'failed' | 'started'
+export type SaveOutcome = 'saved' | 'cancelled' | 'failed' | 'started' | 'requested'
 
 function shareableFile(blob: Blob, filename: string, mime: string) {
   if (typeof navigator.share !== 'function' || !IMAGE_MIME.has(mime)) return null
@@ -109,6 +109,15 @@ function anchorDownload(url: string, filename: string, removeAfter = 0) {
   else anchor.remove()
 }
 
+function openDownload(url: string) {
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.removeAttribute('download')
+  document.body.appendChild(anchor)
+  anchor.click()
+  window.setTimeout(() => anchor.remove(), 1500)
+}
+
 const KAKAO_DATA_URL_LIMIT = 12 * 1024 * 1024
 
 function blobToDataUrl(blob: Blob) {
@@ -123,11 +132,11 @@ function blobToDataUrl(blob: Blob) {
   })
 }
 
-function saveOnAndroid(filename: string): Promise<SaveOutcome> {
-  const direct = directDownloadUrl(filename)
+function saveOnAndroid(downloadId: string | null, filename: string): Promise<SaveOutcome> {
+  const direct = directDownloadUrl(downloadId, filename)
   if (!direct) return Promise.resolve('failed')
-  anchorDownload(direct, filename, 1500)
-  return Promise.resolve('started')
+  openDownload(direct)
+  return Promise.resolve('requested')
 }
 
 async function saveInKakao(blob: Blob, filename: string): Promise<SaveOutcome> {
@@ -141,9 +150,15 @@ async function saveInKakao(blob: Blob, filename: string): Promise<SaveOutcome> {
   }
 }
 
-export function saveFile(blob: Blob, url: string, filename: string, mime: string): Promise<SaveOutcome> {
+export function saveFile(
+  blob: Blob,
+  url: string,
+  filename: string,
+  mime: string,
+  downloadId: string | null,
+): Promise<SaveOutcome> {
   if (isKakaoTalk()) return saveInKakao(blob, filename)
-  if (isAndroid()) return saveOnAndroid(filename)
+  if (isAndroid()) return saveOnAndroid(downloadId, filename)
   if (isIos()) return shareImage(blob, filename, mime)
 
   anchorDownload(url, filename)

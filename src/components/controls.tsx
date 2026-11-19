@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { sizeFromWidth } from '../lib/aspect'
 import { byteFieldValue, targetFromField, type ByteUnit } from '../lib/byte-field'
 import { errorMessage } from '../lib/error-message'
+import { publishDownload } from '../lib/download-bridge'
 import { FORMAT_META, FORMATS, QUALITY_PRESETS, downloadName, fileStem, isAndroid, isKakaoTalk, isResultCurrent, saveFile } from '../lib/files'
 import { useI18n } from '../lib/use-i18n'
 import { useEditorStore } from '../store/editor-store'
@@ -46,6 +47,7 @@ export function Controls() {
   const [isSheet, setIsSheet] = useState(false)
   const [isImageOpen, setIsImageOpen] = useState(false)
   const [toast, setToast] = useState<{ tone: ToastTone; id: number; message?: string; long?: boolean } | null>(null)
+  const [downloadHint, setDownloadHint] = useState<string | null>(null)
   const closePresets = useCallback(() => setIsPresetOpen(false), [])
   const closeSheet = useCallback(() => {
     setIsSheet(false)
@@ -65,6 +67,10 @@ export function Controls() {
   useEffect(() => {
     setDownloadStem('')
   }, [sourceName])
+
+  useEffect(() => {
+    setDownloadHint(null)
+  }, [result?.url])
 
   useEffect(() => {
     if (!toast) return
@@ -116,18 +122,33 @@ export function Controls() {
 
   const saveResult = () => {
     if (!result) return
+    const current = result
     const typed = downloadStem.trim()
-    void saveFile(result.blob, result.url, downloadName(typed || source.name, result.format), FORMAT_META[result.format].mime).then(
+    const mime = FORMAT_META[current.format].mime
+    void saveFile(current.blob, current.url, downloadName(typed || source.name, current.format), mime, current.downloadId).then(
       (outcome) => {
         if (outcome === 'saved') {
+          setDownloadHint(null)
           setToast({ tone: 'saved', id: Date.now(), message: t('imageSaved') })
           return
         }
-        if (outcome === 'started' && (isKakaoTalk() || isAndroid())) {
+        if (outcome === 'requested') {
+          setDownloadHint(null)
+          setToast({ tone: 'saved', id: Date.now(), message: t('downloadRequested') })
+          return
+        }
+        if (outcome === 'started' && isKakaoTalk()) {
           setToast({ tone: 'saved', id: Date.now(), message: t('downloadStarted') })
           return
         }
-        if (outcome === 'failed' && !isAndroid()) setIsImageOpen(true)
+        if (outcome === 'failed' && isAndroid()) {
+          void publishDownload(current.downloadId, current.blob, mime)
+          const message = t('downloadRetry')
+          setDownloadHint(message)
+          setToast({ tone: 'limit', id: Date.now(), message, long: true })
+          return
+        }
+        if (outcome === 'failed') setIsImageOpen(true)
       },
     )
   }
@@ -337,6 +358,7 @@ export function Controls() {
 
           <div className="flex shrink-0 flex-col gap-2.5 border-t border-line bg-panel px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             {error ? <p className="text-sm text-accent">{errorMessage(locale, error)}</p> : null}
+            {downloadHint ? <p className="text-sm text-accent">{downloadHint}</p> : null}
             {status === 'error' ? (
               <button type="button" onClick={retry} className="h-10 cursor-pointer rounded-full border border-line text-sm font-medium">
                 {t('retry')}

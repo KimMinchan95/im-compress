@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { publishDownload } from './download-bridge'
+import { createDownloadId, publishDownload } from './download-bridge'
 import { FORMAT_META, ensureMime } from './files'
 import { matchBytes } from './match-bytes'
 import { useEditorStore } from '../store/editor-store'
@@ -97,12 +97,14 @@ export function useEncoder() {
             if (cancelled) return
             const matchedBlob = await ensureMime(matched.blob, FORMAT_META[latest.format].mime)
             if (cancelled) return
-            await publishDownload(matchedBlob, FORMAT_META[latest.format].mime)
+            const matchedDownloadId = createDownloadId()
+            await publishDownload(matchedDownloadId, matchedBlob, FORMAT_META[latest.format].mime)
             if (cancelled) return
             applyMatched({
               result: {
                 url: URL.createObjectURL(matchedBlob),
                 blob: matchedBlob,
+                downloadId: matchedDownloadId,
                 bytes: matchedBlob.size,
                 width: matched.width,
                 height: matched.height,
@@ -130,11 +132,13 @@ export function useEncoder() {
           if (cancelled) return
           const typed = await ensureMime(blob, FORMAT_META[latest.format].mime)
           if (cancelled) return
-          await publishDownload(typed, FORMAT_META[latest.format].mime)
+          const downloadId = createDownloadId()
+          await publishDownload(downloadId, typed, FORMAT_META[latest.format].mime)
           if (cancelled) return
           applyResult({
             url: URL.createObjectURL(typed),
             blob: typed,
+            downloadId,
             bytes: typed.size,
             width: latest.width,
             height: latest.height,

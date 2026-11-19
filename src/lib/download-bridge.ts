@@ -1,8 +1,8 @@
-const WORKER_VERSION = '5'
+const WORKER_VERSION = '7'
 
-let ready = false
-let token = 0
-let lastFile: { blob: Blob; mime: string } | null = null
+const readyIds = new Set<string>()
+let lastFile: { id: string; blob: Blob; mime: string } | null = null
+let replacing: Promise<void> | null = null
 
 function workerScript() {
   return `${import.meta.env.BASE_URL}download-sw.js?v=${WORKER_VERSION}`
@@ -12,21 +12,37 @@ function isDownloadWorker(scriptUrl: string) {
   return scriptUrl.includes('download-sw.js')
 }
 
+function workerVersion(scriptUrl: string) {
+  try {
+    return new URL(scriptUrl).searchParams.get('v')
+  } catch {
+    return null
+  }
+}
+
 function isCurrentWorker(scriptUrl: string) {
-  return isDownloadWorker(scriptUrl) && scriptUrl.includes(`v=${WORKER_VERSION}`)
+  return isDownloadWorker(scriptUrl) && workerVersion(scriptUrl) === WORKER_VERSION
 }
 
 export function registerDownloadBridge() {
   if (!('serviceWorker' in navigator)) return
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    ready = false
     if (!lastFile) return
-    void publishDownload(lastFile.blob, lastFile.mime)
+    void publishDownload(lastFile.id, lastFile.blob, lastFile.mime)
   })
-  void replaceDownloadWorker()
+  void replaceDownloadWorker().catch(() => undefined)
 }
 
-async function replaceDownloadWorker() {
+function replaceDownloadWorker() {
+  if (!replacing) {
+    replacing = replaceDownloadWorkerOnce().finally(() => {
+      replacing = null
+    })
+  }
+  return replacing
+}
+
+async function replaceDownloadWorkerOnce() {
   const registrations = await navigator.serviceWorker.getRegistrations()
   await Promise.all(
     registrations.map((registration) => {
@@ -38,59 +54,89 @@ async function replaceDownloadWorker() {
       return registration.unregister()
     }),
   )
-  await navigator.serviceWorker.register(workerScript())
+  const registration = await navigator.serviceWorker.register(workerScript())
+  await registration.update().catch(() => undefined)
 }
 
-function whenControlled() {
-  if (navigator.serviceWorker.controller) return Promise.resolve()
-  return new Promise<void>((resolve) => {
-    const timer = window.setTimeout(resolve, 4000)
-    navigator.serviceWorker.addEventListener(
-      'controllerchange',
-      () => {
-        window.clearTimeout(timer)
-        resolve()
-      },
-      { once: true },
-    )
+function whenCurrentController() {
+  const current = navigator.serviceWorker.controller
+  if (current && isCurrentWorker(current.scriptURL)) return Promise.resolve(current)
+  return new Promise<ServiceWorker | null>((resolve) => {
+    const onChange = () => {
+      window.clearTimeout(timer)
+      resolve(navigator.serviceWorker.controller)
+    }
+    const timer = window.setTimeout(() => {
+      navigator.serviceWorker.removeEventListener('controllerchange', onChange)
+      resolve(navigator.serviceWorker.controller)
+    }, 8000)
+    navigator.serviceWorker.addEventListener('controllerchange', onChange)
   })
 }
 
-export async function publishDownload(blob: Blob, mime: string) {
-  const current = ++token
-  lastFile = { blob, mime }
-  if (!('serviceWorker' in navigator)) return
-
-  const finished = (async () => {
-    try {
-      await navigator.serviceWorker.ready
-      if (current !== token) return
-      if (!navigator.serviceWorker.controller) await whenControlled()
-      const worker = navigator.serviceWorker.controller
-      if (!worker || current !== token || !isDownloadWorker(worker.scriptURL)) return
-      const buffer = await blob.arrayBuffer()
-      if (current !== token) return
-      await new Promise<void>((resolve, reject) => {
-        const channel = new MessageChannel()
-        const timer = window.setTimeout(() => reject(new Error('timeout')), 4000)
-        channel.port1.onmessage = (event: MessageEvent<{ ok?: boolean }>) => {
-          window.clearTimeout(timer)
-          if (event.data?.ok) resolve()
-          else reject(new Error('rejected'))
-        }
-        worker.postMessage({ type: 'file', mime, buffer }, [channel.port2])
-      })
-      if (current === token && navigator.serviceWorker.controller === worker) ready = true
-    } catch {
-      if (current === token) ready = false
-    }
-  })()
-
-  await Promise.race([finished, new Promise((resolve) => window.setTimeout(resolve, 4000))])
+export function createDownloadId() {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
 }
 
-export function directDownloadUrl(filename: string) {
-  const worker = navigator.serviceWorker?.controller
-  if (!ready || !worker || !isDownloadWorker(worker.scriptURL)) return null
-  return `${import.meta.env.BASE_URL}__download?${new URLSearchParams({ name: filename })}`
+function rememberReady(id: string) {
+  readyIds.add(id)
+}
+
+function postFile(worker: ServiceWorker, id: string, mime: string, buffer: ArrayBuffer) {
+  return new Promise<boolean>((resolve) => {
+    let settled = false
+    const finish = (accepted: boolean) => {
+      if (accepted) rememberReady(id)
+      if (settled) return
+      settled = true
+      window.clearTimeout(timer)
+      resolve(accepted)
+    }
+    const channel = new MessageChannel()
+    const timer = window.setTimeout(() => finish(false), 8000)
+    channel.port1.onmessage = (event: MessageEvent<{ ok?: boolean; id?: string }>) => {
+      finish(Boolean(event.data?.ok && event.data.id === id))
+    }
+    try {
+      worker.postMessage({ type: 'file', id, mime, buffer }, [buffer, channel.port2])
+    } catch {
+      finish(false)
+    }
+  })
+}
+
+export async function publishDownload(id: string, blob: Blob, mime: string) {
+  lastFile = { id, blob, mime }
+  if (!('serviceWorker' in navigator)) return false
+
+  const attempt = (async () => {
+    const controller = navigator.serviceWorker.controller
+    if (!controller || !isCurrentWorker(controller.scriptURL)) await replaceDownloadWorker()
+    const registration = await navigator.serviceWorker.ready
+    const active = registration.active
+    if (!navigator.serviceWorker.controller && active && isCurrentWorker(active.scriptURL)) {
+      active.postMessage({ type: 'claim' })
+    }
+    let worker = navigator.serviceWorker.controller
+    if (!worker || !isCurrentWorker(worker.scriptURL)) worker = await whenCurrentController()
+    if (!worker || !isCurrentWorker(worker.scriptURL)) return false
+    const buffer = await blob.arrayBuffer()
+    return postFile(worker, id, mime, buffer)
+  })().catch(() => false)
+
+  return Promise.race([
+    attempt,
+    new Promise<boolean>((resolve) => window.setTimeout(() => resolve(false), 8000)),
+  ])
+}
+
+export function directDownloadUrl(id: string | null, filename: string) {
+  if (!id || !readyIds.has(id) || !('serviceWorker' in navigator)) return null
+  const params = new URLSearchParams({ id, name: filename })
+  return `${import.meta.env.BASE_URL}__download?${params}`
 }

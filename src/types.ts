@@ -20,6 +20,7 @@ export interface SourceImage {
 export interface EncodeResult {
   url: string
   blob: Blob
+  downloadId: string
   bytes: number
   width: number
   height: number
