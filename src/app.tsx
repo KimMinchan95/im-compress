@@ -4,7 +4,7 @@ import { DropZone } from './components/drop-zone'
 import { Header } from './components/header'
 import { Preview } from './components/preview'
 import { paintDocumentTheme } from './lib/document-theme'
-import { isKakaoTalk, openKakaoExternal } from './lib/files'
+import { isKakaoTalk, kakaoExternalUrl, leaveKakaoOnce } from './lib/files'
 import { useFileDrop } from './lib/use-file-drop'
 import { useI18n } from './lib/use-i18n'
 import { useEncoder } from './lib/use-encoder'
@@ -20,6 +20,26 @@ const DOCUMENT_TITLE = {
 function EncodeBridge() {
   useEncoder()
   return null
+}
+
+function KakaoGate() {
+  const { t } = useI18n()
+
+  useEffect(() => {
+    leaveKakaoOnce()
+  }, [])
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-ink px-6 text-center">
+      <p className="max-w-sm text-lg font-semibold leading-7">{t('kakaoDownload')}</p>
+      <a
+        href={kakaoExternalUrl(window.location.href)}
+        className="inline-flex h-12 items-center rounded-full bg-accent px-6 text-base font-semibold text-on-accent transition duration-200 active:scale-[0.98]"
+      >
+        {t('openBrowser')}
+      </a>
+    </div>
+  )
 }
 
 function ThemeSync() {
@@ -61,18 +81,6 @@ export default function App() {
       )}
       <div className="relative z-10 mx-auto flex h-full w-full flex-col">
         <Header />
-        {isKakaoTalk() ? (
-          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-sunken px-4 py-2.5 md:px-8">
-            <p className="text-sm leading-5 text-cream">{t('kakaoDownload')}</p>
-            <button
-              type="button"
-              onClick={openKakaoExternal}
-              className="h-9 shrink-0 cursor-pointer rounded-full bg-accent px-3 text-sm font-semibold text-on-accent transition duration-200 active:scale-[0.98]"
-            >
-              {t('openBrowser')}
-            </button>
-          </div>
-        ) : null}
         {hasSource ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
             <Preview />
@@ -82,6 +90,7 @@ export default function App() {
           <DropZone />
         )}
       </div>
+      {isKakaoTalk() ? <KakaoGate /> : null}
       {isDragging ? (
         <div className="overlay-in pointer-events-none absolute inset-0 z-20 grid place-items-center bg-ink/80 px-6 text-center backdrop-blur-sm">
           <p className="rise text-4xl font-semibold tracking-tight">{t('dropOverlay')}</p>

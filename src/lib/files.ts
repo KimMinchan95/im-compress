@@ -53,6 +53,14 @@ export function openKakaoExternal() {
   window.location.assign(kakaoExternalUrl(window.location.href))
 }
 
+let didLeaveKakao = false
+
+export function leaveKakaoOnce() {
+  if (didLeaveKakao) return
+  didLeaveKakao = true
+  openKakaoExternal()
+}
+
 function isAndroid() {
   return /Android/i.test(navigator.userAgent)
 }
@@ -115,19 +123,10 @@ function blobToDataUrl(blob: Blob) {
   })
 }
 
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
-  anchorDownload(url, filename, 60_000)
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
-}
-
-function saveOnAndroid(blob: Blob, filename: string): Promise<SaveOutcome> {
+function saveOnAndroid(filename: string): Promise<SaveOutcome> {
   const direct = directDownloadUrl(filename)
-  if (direct) {
-    anchorDownload(direct, filename)
-    return Promise.resolve('started')
-  }
-  downloadBlob(blob, filename)
+  if (!direct) return Promise.resolve('failed')
+  anchorDownload(direct, filename)
   return Promise.resolve('started')
 }
 
@@ -144,7 +143,7 @@ async function saveInKakao(blob: Blob, filename: string): Promise<SaveOutcome> {
 
 export function saveFile(blob: Blob, url: string, filename: string, mime: string): Promise<SaveOutcome> {
   if (isKakaoTalk()) return saveInKakao(blob, filename)
-  if (isAndroid()) return saveOnAndroid(blob, filename)
+  if (isAndroid()) return saveOnAndroid(filename)
   if (isIos()) return shareImage(blob, filename, mime)
 
   anchorDownload(url, filename)
