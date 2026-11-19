@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { sizeFromWidth } from '../lib/aspect'
 import { byteFieldValue, targetFromField, type ByteUnit } from '../lib/byte-field'
-import { cycleChoice } from '../lib/cycle-choice'
 import { errorMessage } from '../lib/error-message'
 import { FORMAT_META, FORMATS, QUALITY_PRESETS, downloadName, fileStem, isKakaoTalk, isResultCurrent, saveFile } from '../lib/files'
 import { useI18n } from '../lib/use-i18n'
@@ -12,8 +11,6 @@ import { ChevronIcon } from './icons'
 import { NumberField } from './number-field'
 import { PresetDialog } from './preset-dialog'
 import { SaveImageSheet } from './save-image-sheet'
-
-const QUALITY_VALUES = QUALITY_PRESETS.map((preset) => preset.value)
 
 type ToastTone = 'saved' | 'limit'
 
@@ -195,7 +192,7 @@ export function Controls() {
                     key={item}
                     type="button"
                     aria-pressed={format === item}
-                    onClick={() => setFormat(cycleChoice(format, item, FORMATS))}
+                    onClick={() => setFormat(item)}
                     className={`h-12 cursor-pointer rounded-2xl text-base font-semibold transition duration-200 active:scale-[0.97] ${
                       format === item
                         ? 'bg-cream text-ink shadow-[0_8px_24px_rgba(0,0,0,0.12)]'
@@ -227,7 +224,7 @@ export function Controls() {
                         key={preset.id}
                         type="button"
                         aria-pressed={quality === preset.value}
-                        onClick={() => setQuality(cycleChoice(quality, preset.value, QUALITY_VALUES))}
+                        onClick={() => setQuality(preset.value)}
                         className={`h-11 cursor-pointer rounded-xl text-sm font-semibold transition duration-200 active:scale-[0.97] ${
                           quality === preset.value ? 'bg-cream text-ink' : 'bg-panel text-muted hover:-translate-y-0.5 hover:text-cream'
                         }`}
@@ -372,7 +369,14 @@ export function Controls() {
                 status === 'encoding' ? 'cursor-wait' : 'disabled:cursor-not-allowed'
               }`}
             >
-              {status === 'encoding' ? t('encoding') : t('download')}
+              {status === 'encoding' ? (
+                t('encoding')
+              ) : (
+                <>
+                  <span className="md:hidden">{t('convert')}</span>
+                  <span className="hidden md:inline">{t('download')}</span>
+                </>
+              )}
             </button>
           </div>
           {isPresetOpen ? <PresetDialog onClose={closePresets} /> : null}

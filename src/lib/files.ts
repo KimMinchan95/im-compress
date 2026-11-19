@@ -1,4 +1,5 @@
 import type { EncodeResult, OutputFormat } from '../types'
+import { directDownloadUrl } from './download-bridge'
 
 export const FORMAT_META: Record<OutputFormat, { label: string; mime: string; extension: string }> = {
   jpeg: { label: 'JPG', mime: 'image/jpeg', extension: 'jpg' },
@@ -120,8 +121,12 @@ function downloadBlob(blob: Blob, filename: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
-function saveOnAndroid(blob: Blob, filename: string, mime: string): Promise<SaveOutcome> {
-  if (shareableFile(blob, filename, mime)) return shareImage(blob, filename, mime)
+function saveOnAndroid(blob: Blob, filename: string): Promise<SaveOutcome> {
+  const direct = directDownloadUrl(filename)
+  if (direct) {
+    anchorDownload(direct, filename)
+    return Promise.resolve('started')
+  }
   downloadBlob(blob, filename)
   return Promise.resolve('started')
 }
@@ -139,7 +144,7 @@ async function saveInKakao(blob: Blob, filename: string): Promise<SaveOutcome> {
 
 export function saveFile(blob: Blob, url: string, filename: string, mime: string): Promise<SaveOutcome> {
   if (isKakaoTalk()) return saveInKakao(blob, filename)
-  if (isAndroid()) return saveOnAndroid(blob, filename, mime)
+  if (isAndroid()) return saveOnAndroid(blob, filename)
   if (isIos()) return shareImage(blob, filename, mime)
 
   anchorDownload(url, filename)

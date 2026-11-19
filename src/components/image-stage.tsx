@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from 'react'
-import { cycleChoice } from '../lib/cycle-choice'
 import { useI18n } from '../lib/use-i18n'
 import { useEditorStore } from '../store/editor-store'
 import { MAX_ZOOM, MIN_ZOOM, clampZoom, useStageStore } from '../store/stage-store'
@@ -23,7 +22,6 @@ interface ZoomAnchor {
   zoom: number
 }
 
-const COMPARE_MODES = ['original', 'result', 'split'] as const
 const ZOOM_STEP = 1.2
 const SPLIT_LABEL =
   'pointer-events-none absolute z-20 whitespace-nowrap rounded-full bg-[#100f0d]/75 px-2.5 py-1 text-xs font-medium text-[#f6f1e7]'
@@ -291,7 +289,7 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
 
   const pickMode = (next: CompareMode) => {
     if (!resultUrl) return
-    setCompareMode(cycleChoice(mode, next, COMPARE_MODES))
+    setCompareMode(next)
   }
 
   return (
