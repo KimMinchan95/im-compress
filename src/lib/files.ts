@@ -61,7 +61,7 @@ export function leaveKakaoOnce() {
   openKakaoExternal()
 }
 
-function isAndroid() {
+export function isAndroid() {
   return /Android/i.test(navigator.userAgent)
 }
 
@@ -126,7 +126,7 @@ function blobToDataUrl(blob: Blob) {
 function saveOnAndroid(filename: string): Promise<SaveOutcome> {
   const direct = directDownloadUrl(filename)
   if (!direct) return Promise.resolve('failed')
-  anchorDownload(direct, filename)
+  anchorDownload(direct, filename, 1500)
   return Promise.resolve('started')
 }
 

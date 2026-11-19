@@ -67,7 +67,7 @@ export async function publishDownload(blob: Blob, mime: string) {
       if (current !== token) return
       if (!navigator.serviceWorker.controller) await whenControlled()
       const worker = navigator.serviceWorker.controller
-      if (!worker || current !== token || !isCurrentWorker(worker.scriptURL)) return
+      if (!worker || current !== token || !isDownloadWorker(worker.scriptURL)) return
       const buffer = await blob.arrayBuffer()
       if (current !== token) return
       await new Promise<void>((resolve, reject) => {
@@ -91,6 +91,6 @@ export async function publishDownload(blob: Blob, mime: string) {
 
 export function directDownloadUrl(filename: string) {
   const worker = navigator.serviceWorker?.controller
-  if (!ready || !worker || !isCurrentWorker(worker.scriptURL)) return null
+  if (!ready || !worker || !isDownloadWorker(worker.scriptURL)) return null
   return `${import.meta.env.BASE_URL}__download?${new URLSearchParams({ name: filename })}`
 }

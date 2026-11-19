@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { sizeFromWidth } from '../lib/aspect'
 import { byteFieldValue, targetFromField, type ByteUnit } from '../lib/byte-field'
 import { errorMessage } from '../lib/error-message'
-import { FORMAT_META, FORMATS, QUALITY_PRESETS, downloadName, fileStem, isKakaoTalk, isResultCurrent, saveFile } from '../lib/files'
+import { FORMAT_META, FORMATS, QUALITY_PRESETS, downloadName, fileStem, isAndroid, isKakaoTalk, isResultCurrent, saveFile } from '../lib/files'
 import { useI18n } from '../lib/use-i18n'
 import { useEditorStore } from '../store/editor-store'
 import { isSamePreset, presetName, usePresets } from '../store/preset-store'
@@ -123,11 +123,11 @@ export function Controls() {
           setToast({ tone: 'saved', id: Date.now(), message: t('imageSaved') })
           return
         }
-        if (outcome === 'started' && isKakaoTalk()) {
+        if (outcome === 'started' && (isKakaoTalk() || isAndroid())) {
           setToast({ tone: 'saved', id: Date.now(), message: t('downloadStarted') })
           return
         }
-        if (outcome === 'failed') setIsImageOpen(true)
+        if (outcome === 'failed' && !isAndroid()) setIsImageOpen(true)
       },
     )
   }
