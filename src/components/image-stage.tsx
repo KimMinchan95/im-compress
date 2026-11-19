@@ -296,7 +296,7 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-3">
-      <div className="flex flex-nowrap items-center justify-between gap-2 overflow-x-auto">
+      <div className="flex flex-nowrap items-center justify-between gap-2 overflow-x-auto md:overflow-visible">
         <div className="flex rounded-full bg-sunken p-1 ring-1 ring-line" role="group" aria-label={t('split')}>
           <ModeButton pressed={mode === 'original'} onClick={() => pickMode('original')}>
             {t('original')}
@@ -323,7 +323,7 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
               type="button"
               aria-label={t('fullscreen')}
               onClick={openFullscreen}
-              className="grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-sunken text-cream ring-1 ring-line transition duration-200 hover:scale-105 active:scale-95"
+              className="grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full bg-sunken text-cream ring-1 ring-line transition duration-200 hover:bg-cream/10 active:scale-95"
             >
               <ExpandIcon />
             </button>

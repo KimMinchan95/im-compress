@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { FORMAT_META } from '../lib/files'
+import { formatBytes } from '../lib/format-bytes'
 import { useI18n } from '../lib/use-i18n'
 import { useEditorStore } from '../store/editor-store'
-import { presetName, usePresets, type SavedPreset } from '../store/preset-store'
+import { formatScale, usePresets, type SavedPreset } from '../store/preset-store'
 import { CloseIcon } from './icons'
 
 interface PresetDialogProps {
@@ -64,22 +66,17 @@ export function PresetDialog({ onClose }: PresetDialogProps) {
         ) : (
           <ul className="mt-4 flex min-h-0 flex-col gap-2 overflow-y-auto">
             {presets.map((preset) => {
-              const detail = presetName(preset.format, preset.quality, preset.scale, preset.targetBytes, preset.sizeMode)
+              const summary = presetSummary(preset, t)
               const isDefault = preset.id === defaultId
               return (
                 <li key={preset.id} className="flex flex-col gap-2 rounded-2xl bg-sunken px-3 py-2.5 ring-1 ring-line">
-                  <span className="min-w-0">
-                    <span className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium">{preset.name}</span>
-                      {isDefault ? (
-                        <span className="shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-xs font-semibold text-accent">
-                          {t('defaultPreset')}
-                        </span>
-                      ) : null}
-                    </span>
-                    {detail === preset.name ? null : (
-                      <span className="mt-0.5 block truncate text-xs text-muted">{detail}</span>
-                    )}
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-sm font-medium whitespace-nowrap">{summary}</span>
+                    {isDefault ? (
+                      <span className="shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-xs font-semibold text-accent">
+                        {t('defaultPreset')}
+                      </span>
+                    ) : null}
                   </span>
                   <span className="flex items-center gap-2">
                     <button
@@ -117,5 +114,16 @@ export function PresetDialog({ onClose }: PresetDialogProps) {
     </div>,
     document.body,
   )
+}
+
+function presetSummary(preset: SavedPreset, t: ReturnType<typeof useI18n>['t']) {
+  const size =
+    preset.sizeMode === 'bytes' && preset.targetBytes
+      ? t('presetBytes')(formatBytes(preset.targetBytes))
+      : t('presetScale')(formatScale(preset.scale))
+  const parts = [`${t('format')}: ${FORMAT_META[preset.format].label}`]
+  if (preset.format !== 'png') parts.push(`${t('quality')}: ${preset.quality}%`)
+  parts.push(size)
+  return parts.join(' · ')
 }
 

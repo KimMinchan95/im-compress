@@ -88,15 +88,25 @@ export function Controls() {
   const bytesField = byteFieldValue(shownBytes, byteUnit)
 
   const saveCurrent = () => {
-    const savedTarget = isBytes ? targetBytes : null
-    const draft = { format, quality, scale, sizeMode, targetBytes: savedTarget }
+    const latest = useEditorStore.getState()
+    const latestIsBytes = latest.sizeMode === 'bytes'
+    const latestOutput = latest.result?.bytes ?? latest.source?.bytes ?? outputBytes
+    const savedTarget = latestIsBytes ? Math.max(1, Math.round(latest.targetBytes ?? latestOutput)) : null
+    if (latestIsBytes && savedTarget != null && latest.targetBytes !== savedTarget) latest.setTargetBytes(savedTarget)
+    const draft = {
+      format: latest.format,
+      quality: latest.quality,
+      scale: latest.scale,
+      sizeMode: latest.sizeMode,
+      targetBytes: savedTarget,
+    }
     const alreadySaved = presets.some((preset) => isSamePreset(preset, draft))
     if (alreadySaved) {
       setToast({ tone: 'saved', id: Date.now() })
       return
     }
     const outcome = savePreset({
-      name: presetName(format, quality, scale, savedTarget, sizeMode),
+      name: presetName(format, quality),
       ...draft,
     })
     setToast({ tone: outcome, id: Date.now() })
@@ -285,10 +295,9 @@ export function Controls() {
                 <div className="flex items-end gap-2">
                   <div className="min-w-0 flex-1">
                     <NumberField
-                      label={t('bytes')}
+                      label={t('bytesAtMost')}
                       value={bytesField}
                       decimals={byteUnit === 'mb' ? 3 : 0}
-                      live={false}
                       disabled={!isBytes}
                       onChange={commitBytes}
                     />
@@ -341,7 +350,7 @@ export function Controls() {
                 aria-haspopup="dialog"
                 aria-expanded={isPresetOpen}
                 onClick={() => setIsPresetOpen(true)}
-                className="h-10 cursor-pointer rounded-full border border-line bg-sunken text-sm font-medium transition duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
+                className="h-10 cursor-pointer rounded-full border border-line bg-sunken text-sm font-semibold transition duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
               >
                 {t('loadSettings')}
                 {presets.length > 0 ? <span className="ml-1.5 text-muted">{presets.length}</span> : null}

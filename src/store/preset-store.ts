@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { formatBytes } from '../lib/format-bytes'
 import { FORMAT_META } from '../lib/files'
 import type { OutputFormat, SizeMode } from '../types'
 
@@ -31,21 +30,15 @@ function createId() {
 
 type PresetDraft = Pick<SavedPreset, 'format' | 'quality' | 'scale' | 'sizeMode' | 'targetBytes'>
 
-export function presetName(
-  format: OutputFormat,
-  quality: number,
-  scale: number,
-  targetBytes: number | null = null,
-  sizeMode: SizeMode = 'dimensions',
-) {
+export function presetName(format: OutputFormat, quality: number) {
   const label = FORMAT_META[format].label
-  if (sizeMode === 'bytes') {
-    if (format === 'png') return targetBytes ? `${label} · ${formatBytes(targetBytes)}` : label
-    const qualityLabel = `${label} ${quality}%`
-    return targetBytes ? `${qualityLabel} · ${formatBytes(targetBytes)}` : qualityLabel
-  }
-  if (format === 'png') return `${label} · ${scale}%`
-  return `${label} ${quality}% · ${scale}%`
+  if (format === 'png') return label
+  return `${label} ${quality}%`
+}
+
+export function formatScale(scale: number) {
+  const rounded = Math.round(scale * 10) / 10
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
 }
 
 export function isSamePreset(preset: SavedPreset, draft: PresetDraft) {
@@ -75,7 +68,7 @@ export const usePresets = create<PresetState>()(
         const targetBytes = input.sizeMode === 'bytes' ? input.targetBytes : null
         const name =
           input.name.trim().slice(0, 40) ||
-          presetName(input.format, input.quality, input.scale, targetBytes, input.sizeMode)
+          presetName(input.format, input.quality)
         const preset: SavedPreset = {
           id: createId(),
           name,
