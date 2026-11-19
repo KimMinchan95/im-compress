@@ -73,10 +73,10 @@ export function DropZone() {
           </div>
         </div>
         <div className="contents md:flex md:flex-col md:items-center md:gap-5">
-          <div className="order-3 w-full max-w-md md:order-none">
+          <div className="order-3 mx-auto w-full max-w-md md:order-none">
             <CompareShowcase original={t('original')} compressed={t('compressed')} />
           </div>
-          <div className="drop-shell rise order-2 w-full max-w-md md:order-none" style={{ animationDelay: '260ms' }}>
+          <div className="drop-shell rise order-2 mx-auto w-full max-w-md md:order-none" style={{ animationDelay: '260ms' }}>
             <div className="drop-spin" aria-hidden="true" />
             <label className="drop-face">
               <input
