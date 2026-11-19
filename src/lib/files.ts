@@ -1,4 +1,5 @@
 import type { EncodeResult, OutputFormat } from '../types'
+import { directDownloadUrl } from './download-bridge'
 
 export const FORMAT_META: Record<OutputFormat, { label: string; mime: string; extension: string }> = {
   jpeg: { label: 'JPG', mime: 'image/jpeg', extension: 'jpg' },
@@ -40,25 +41,43 @@ export function downloadName(name: string, format: OutputFormat) {
   return `${base}.${FORMAT_META[format].extension}`
 }
 
-function prefersShare() {
-  return window.matchMedia('(pointer: coarse)').matches || /Android/i.test(navigator.userAgent)
+export function isKakaoTalk() {
+  return /KAKAOTALK/i.test(navigator.userAgent)
 }
 
-function canShareFile(file: File) {
-  if (typeof navigator.share !== 'function' || typeof navigator.canShare !== 'function') return false
-  try {
-    return navigator.canShare({ files: [file] })
-  } catch {
-    return false
-  }
+export function kakaoExternalUrl(pageUrl: string) {
+  return `kakaotalk://web/openExternal?url=${encodeURIComponent(pageUrl)}`
 }
 
-function shareableFile(blob: Blob, filename: string) {
-  const typed = new File([blob], filename, { type: blob.type || 'application/octet-stream' })
-  if (canShareFile(typed)) return typed
-  if (typed.type === 'application/octet-stream') return null
-  const generic = new File([blob], filename, { type: 'application/octet-stream' })
-  return canShareFile(generic) ? generic : null
+export function openKakaoExternal() {
+  window.location.assign(kakaoExternalUrl(window.location.href))
+}
+
+function isAndroid() {
+  return /Android/i.test(navigator.userAgent)
+}
+
+function isIos() {
+  const ua = navigator.userAgent
+  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
+const IMAGE_MIME = new Set(Object.values(FORMAT_META).map((meta) => meta.mime))
+
+export type SaveOutcome = 'saved' | 'cancelled' | 'failed' | 'started'
+
+function shareImage(blob: Blob, filename: string, mime: string) {
+  if (typeof navigator.share !== 'function' || !IMAGE_MIME.has(mime)) return Promise.resolve<SaveOutcome>('failed')
+  const file = new File([blob], filename, { type: mime })
+  return navigator.share({ files: [file] }).then(
+    () => 'saved' as const,
+    (error: unknown) => (error instanceof DOMException && error.name === 'AbortError' ? 'cancelled' : 'failed'),
+  )
+}
+
+export async function ensureMime(blob: Blob, mime: string) {
+  if (blob.type === mime) return blob
+  return new Blob([await blob.arrayBuffer()], { type: mime })
 }
 
 function anchorDownload(url: string, filename: string) {
@@ -71,19 +90,21 @@ function anchorDownload(url: string, filename: string) {
   anchor.remove()
 }
 
-export function saveFile(blob: Blob, url: string, filename: string) {
-  if (prefersShare()) {
-    const file = shareableFile(blob, filename)
-    if (file) {
-      void navigator.share({ files: [file] }).catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === 'AbortError') return
-        anchorDownload(url, filename)
-      })
-      return
+export function saveFile(blob: Blob, url: string, filename: string, mime: string): Promise<SaveOutcome> {
+  if (isKakaoTalk()) return shareImage(blob, filename, mime)
+
+  if (isAndroid()) {
+    const direct = directDownloadUrl(filename)
+    if (direct) {
+      anchorDownload(direct, filename)
+      return Promise.resolve('started')
     }
   }
 
+  if (isIos()) return shareImage(blob, filename, mime)
+
   anchorDownload(url, filename)
+  return Promise.resolve('started')
 }
 
 export function takeFile(input: HTMLInputElement) {

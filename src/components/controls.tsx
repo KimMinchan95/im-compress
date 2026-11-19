@@ -4,13 +4,14 @@ import { sizeFromWidth } from '../lib/aspect'
 import { byteFieldValue, targetFromField, type ByteUnit } from '../lib/byte-field'
 import { cycleChoice } from '../lib/cycle-choice'
 import { errorMessage } from '../lib/error-message'
-import { FORMAT_META, FORMATS, QUALITY_PRESETS, downloadName, fileStem, isResultCurrent, saveFile } from '../lib/files'
+import { FORMAT_META, FORMATS, QUALITY_PRESETS, downloadName, fileStem, isKakaoTalk, isResultCurrent, saveFile } from '../lib/files'
 import { useI18n } from '../lib/use-i18n'
 import { useEditorStore } from '../store/editor-store'
 import { isSamePreset, presetName, usePresets } from '../store/preset-store'
 import { ChevronIcon } from './icons'
 import { NumberField } from './number-field'
 import { PresetDialog } from './preset-dialog'
+import { SaveImageSheet } from './save-image-sheet'
 
 const QUALITY_VALUES = QUALITY_PRESETS.map((preset) => preset.value)
 
@@ -46,7 +47,8 @@ export function Controls() {
   const [isPresetOpen, setIsPresetOpen] = useState(false)
   const [isOpen, setIsOpen] = useState(() => window.matchMedia('(min-width: 768px)').matches)
   const [isSheet, setIsSheet] = useState(false)
-  const [toast, setToast] = useState<{ tone: ToastTone; id: number } | null>(null)
+  const [isImageOpen, setIsImageOpen] = useState(false)
+  const [toast, setToast] = useState<{ tone: ToastTone; id: number; message?: string; long?: boolean } | null>(null)
   const closePresets = useCallback(() => setIsPresetOpen(false), [])
   const closeSheet = useCallback(() => {
     setIsSheet(false)
@@ -69,7 +71,7 @@ export function Controls() {
 
   useEffect(() => {
     if (!toast) return
-    const timer = window.setTimeout(() => setToast(null), toast.tone === 'saved' ? 1800 : 2600)
+    const timer = window.setTimeout(() => setToast(null), toast.long ? 3200 : toast.tone === 'saved' ? 1800 : 2600)
     return () => window.clearTimeout(timer)
   }, [toast])
 
@@ -102,8 +104,24 @@ export function Controls() {
 
   const download = () => {
     if (!result) return
+    if (isKakaoTalk()) {
+      setIsImageOpen(true)
+      return
+    }
+    saveResult()
+  }
+
+  const saveResult = () => {
+    if (!result) return
     const typed = downloadStem.trim()
-    saveFile(result.blob, result.url, downloadName(typed || source.name, result.format))
+    void saveFile(result.blob, result.url, downloadName(typed || source.name, result.format), FORMAT_META[result.format].mime).then(
+      (outcome) => {
+        if (outcome === 'saved') setToast({ tone: 'saved', id: Date.now(), message: t('imageSaved') })
+        if (outcome === 'failed' && !isKakaoTalk()) {
+          setToast({ tone: 'saved', id: Date.now(), message: t('imageSaveHint'), long: true })
+        }
+      },
+    )
   }
 
   const commitBytes = (value: number) => {
@@ -348,7 +366,12 @@ export function Controls() {
             </button>
           </div>
           {isPresetOpen ? <PresetDialog onClose={closePresets} /> : null}
-          {toast ? <SaveToast tone={toast.tone} message={toast.tone === 'limit' ? t('presetLimit') : t('presetSaved')} /> : null}
+          {toast ? (
+            <SaveToast tone={toast.tone} message={toast.message ?? (toast.tone === 'limit' ? t('presetLimit') : t('presetSaved'))} />
+          ) : null}
+          {isImageOpen && result ? (
+            <SaveImageSheet url={result.url} onClose={() => setIsImageOpen(false)} onDownload={saveResult} />
+          ) : null}
         </div>
       </div>
       {isSheet ? null : (

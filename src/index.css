@@ -68,6 +68,12 @@ body {
     color: var(--cream);
 }
 
+.save-callout {
+    -webkit-touch-callout: default;
+    -webkit-user-select: auto;
+    user-select: auto;
+}
+
 ::selection {
     background: #ff4d2e;
     color: #1a0906;
