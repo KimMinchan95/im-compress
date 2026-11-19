@@ -1,10 +1,13 @@
 let ready = false
 let token = 0
+let lastFile: { blob: Blob; mime: string } | null = null
 
 export function registerDownloadBridge() {
   if (!('serviceWorker' in navigator)) return
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     ready = false
+    if (!lastFile) return
+    void publishDownload(lastFile.blob, lastFile.mime)
   })
   void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}download-sw.js`)
 }
@@ -27,6 +30,7 @@ function whenControlled() {
 export async function publishDownload(blob: Blob, mime: string) {
   const current = ++token
   ready = false
+  lastFile = { blob, mime }
   if (!('serviceWorker' in navigator)) return
 
   const finished = (async () => {

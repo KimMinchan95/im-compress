@@ -1,5 +1,5 @@
 import type { EncodeResult, OutputFormat } from '../types'
-import { directDownloadUrl } from './download-bridge'
+import { directDownloadUrl, publishDownload } from './download-bridge'
 
 export const FORMAT_META: Record<OutputFormat, { label: string; mime: string; extension: string }> = {
   jpeg: { label: 'JPG', mime: 'image/jpeg', extension: 'jpg' },
@@ -104,7 +104,20 @@ function blobToDataUrl(blob: Blob) {
   })
 }
 
-async function saveInKakao(blob: Blob, url: string, filename: string): Promise<SaveOutcome> {
+async function saveDirect(blob: Blob, url: string, filename: string, mime: string): Promise<SaveOutcome> {
+  const readyUrl = directDownloadUrl(filename)
+  if (readyUrl) {
+    anchorDownload(readyUrl, filename)
+    return 'started'
+  }
+
+  await publishDownload(blob, mime)
+  const publishedUrl = directDownloadUrl(filename)
+  anchorDownload(publishedUrl ?? url, filename)
+  return 'started'
+}
+
+async function saveInKakao(blob: Blob, url: string, filename: string, mime: string): Promise<SaveOutcome> {
   if (isIos()) {
     if (blob.size > KAKAO_DATA_URL_LIMIT) return 'failed'
     try {
@@ -115,21 +128,12 @@ async function saveInKakao(blob: Blob, url: string, filename: string): Promise<S
     }
   }
 
-  anchorDownload(directDownloadUrl(filename) ?? url, filename)
-  return 'started'
+  return saveDirect(blob, url, filename, mime)
 }
 
 export function saveFile(blob: Blob, url: string, filename: string, mime: string): Promise<SaveOutcome> {
-  if (isKakaoTalk()) return saveInKakao(blob, url, filename)
-
-  if (isAndroid()) {
-    const direct = directDownloadUrl(filename)
-    if (direct) {
-      anchorDownload(direct, filename)
-      return Promise.resolve('started')
-    }
-  }
-
+  if (isKakaoTalk()) return saveInKakao(blob, url, filename, mime)
+  if (isAndroid()) return saveDirect(blob, url, filename, mime)
   if (isIos()) return shareImage(blob, filename, mime)
 
   anchorDownload(url, filename)
