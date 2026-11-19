@@ -1,5 +1,5 @@
 import type { EncodeResult, OutputFormat } from '../types'
-import { directDownloadUrl, publishDownload } from './download-bridge'
+import { directDownloadUrl } from './download-bridge'
 
 export const FORMAT_META: Record<OutputFormat, { label: string; mime: string; extension: string }> = {
   jpeg: { label: 'JPG', mime: 'image/jpeg', extension: 'jpg' },
@@ -87,7 +87,8 @@ function anchorDownload(url: string, filename: string, removeAfter = 0) {
   anchor.rel = 'noopener'
   document.body.appendChild(anchor)
   anchor.click()
-  window.setTimeout(() => anchor.remove(), removeAfter)
+  if (removeAfter > 0) window.setTimeout(() => anchor.remove(), removeAfter)
+  else anchor.remove()
 }
 
 const KAKAO_DATA_URL_LIMIT = 12 * 1024 * 1024
@@ -104,17 +105,15 @@ function blobToDataUrl(blob: Blob) {
   })
 }
 
-async function saveDirect(blob: Blob, url: string, filename: string, mime: string): Promise<SaveOutcome> {
-  const readyUrl = directDownloadUrl(filename)
-  if (readyUrl) {
-    anchorDownload(readyUrl, filename)
-    return 'started'
+function saveOnAndroid(blob: Blob, url: string, filename: string, mime: string): Promise<SaveOutcome> {
+  const direct = directDownloadUrl(filename)
+  if (direct) {
+    anchorDownload(direct, filename)
+    return Promise.resolve('started')
   }
-
-  await publishDownload(blob, mime)
-  const publishedUrl = directDownloadUrl(filename)
-  anchorDownload(publishedUrl ?? url, filename)
-  return 'started'
+  if (typeof navigator.share === 'function' && IMAGE_MIME.has(mime)) return shareImage(blob, filename, mime)
+  anchorDownload(url, filename)
+  return Promise.resolve('started')
 }
 
 async function saveInKakao(blob: Blob, url: string, filename: string, mime: string): Promise<SaveOutcome> {
@@ -128,12 +127,12 @@ async function saveInKakao(blob: Blob, url: string, filename: string, mime: stri
     }
   }
 
-  return saveDirect(blob, url, filename, mime)
+  return saveOnAndroid(blob, url, filename, mime)
 }
 
 export function saveFile(blob: Blob, url: string, filename: string, mime: string): Promise<SaveOutcome> {
   if (isKakaoTalk()) return saveInKakao(blob, url, filename, mime)
-  if (isAndroid()) return saveDirect(blob, url, filename, mime)
+  if (isAndroid()) return saveOnAndroid(blob, url, filename, mime)
   if (isIos()) return shareImage(blob, filename, mime)
 
   anchorDownload(url, filename)

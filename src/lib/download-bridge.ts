@@ -1,6 +1,20 @@
+const WORKER_VERSION = '5'
+
 let ready = false
 let token = 0
 let lastFile: { blob: Blob; mime: string } | null = null
+
+function workerScript() {
+  return `${import.meta.env.BASE_URL}download-sw.js?v=${WORKER_VERSION}`
+}
+
+function isDownloadWorker(scriptUrl: string) {
+  return scriptUrl.includes('download-sw.js')
+}
+
+function isCurrentWorker(scriptUrl: string) {
+  return isDownloadWorker(scriptUrl) && scriptUrl.includes(`v=${WORKER_VERSION}`)
+}
 
 export function registerDownloadBridge() {
   if (!('serviceWorker' in navigator)) return
@@ -9,13 +23,28 @@ export function registerDownloadBridge() {
     if (!lastFile) return
     void publishDownload(lastFile.blob, lastFile.mime)
   })
-  void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}download-sw.js`)
+  void replaceDownloadWorker()
+}
+
+async function replaceDownloadWorker() {
+  const registrations = await navigator.serviceWorker.getRegistrations()
+  await Promise.all(
+    registrations.map((registration) => {
+      const scripts = [registration.active, registration.waiting, registration.installing]
+        .map((worker) => worker?.scriptURL ?? '')
+        .filter(Boolean)
+      if (scripts.length === 0 || scripts.every((script) => !isDownloadWorker(script))) return Promise.resolve(false)
+      if (scripts.some((script) => isCurrentWorker(script))) return Promise.resolve(false)
+      return registration.unregister()
+    }),
+  )
+  await navigator.serviceWorker.register(workerScript())
 }
 
 function whenControlled() {
   if (navigator.serviceWorker.controller) return Promise.resolve()
   return new Promise<void>((resolve) => {
-    const timer = window.setTimeout(resolve, 2000)
+    const timer = window.setTimeout(resolve, 4000)
     navigator.serviceWorker.addEventListener(
       'controllerchange',
       () => {
@@ -29,38 +58,39 @@ function whenControlled() {
 
 export async function publishDownload(blob: Blob, mime: string) {
   const current = ++token
-  ready = false
   lastFile = { blob, mime }
   if (!('serviceWorker' in navigator)) return
 
   const finished = (async () => {
     try {
-      const registration = await navigator.serviceWorker.ready
-      const worker = registration.active
-      if (!worker || current !== token) return
-      await whenControlled()
-      if (!navigator.serviceWorker.controller || current !== token) return
+      await navigator.serviceWorker.ready
+      if (current !== token) return
+      if (!navigator.serviceWorker.controller) await whenControlled()
+      const worker = navigator.serviceWorker.controller
+      if (!worker || current !== token || !isCurrentWorker(worker.scriptURL)) return
       const buffer = await blob.arrayBuffer()
       if (current !== token) return
       await new Promise<void>((resolve, reject) => {
         const channel = new MessageChannel()
-        const timer = window.setTimeout(() => reject(new Error('timeout')), 2000)
-        channel.port1.onmessage = () => {
+        const timer = window.setTimeout(() => reject(new Error('timeout')), 4000)
+        channel.port1.onmessage = (event: MessageEvent<{ ok?: boolean }>) => {
           window.clearTimeout(timer)
-          resolve()
+          if (event.data?.ok) resolve()
+          else reject(new Error('rejected'))
         }
         worker.postMessage({ type: 'file', mime, buffer }, [channel.port2])
       })
-      if (current === token) ready = true
+      if (current === token && navigator.serviceWorker.controller === worker) ready = true
     } catch {
       if (current === token) ready = false
     }
   })()
 
-  await Promise.race([finished, new Promise((resolve) => window.setTimeout(resolve, 2000))])
+  await Promise.race([finished, new Promise((resolve) => window.setTimeout(resolve, 4000))])
 }
 
 export function directDownloadUrl(filename: string) {
-  if (!ready || !navigator.serviceWorker?.controller) return null
+  const worker = navigator.serviceWorker?.controller
+  if (!ready || !worker || !isCurrentWorker(worker.scriptURL)) return null
   return `${import.meta.env.BASE_URL}__download?${new URLSearchParams({ name: filename })}`
 }
