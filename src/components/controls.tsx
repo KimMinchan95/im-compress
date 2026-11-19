@@ -114,10 +114,6 @@ export function Controls() {
 
   const download = () => {
     if (!result) return
-    if (isKakaoTalk()) {
-      setIsImageOpen(true)
-      return
-    }
     saveResult()
   }
 
@@ -126,8 +122,19 @@ export function Controls() {
     const typed = downloadStem.trim()
     void saveFile(result.blob, result.url, downloadName(typed || source.name, result.format), FORMAT_META[result.format].mime).then(
       (outcome) => {
-        if (outcome === 'saved') setToast({ tone: 'saved', id: Date.now(), message: t('imageSaved') })
-        if (outcome === 'failed' && !isKakaoTalk()) {
+        if (outcome === 'saved') {
+          setToast({ tone: 'saved', id: Date.now(), message: t('imageSaved') })
+          return
+        }
+        if (outcome === 'started' && isKakaoTalk()) {
+          setToast({ tone: 'saved', id: Date.now(), message: t('downloadStarted') })
+          return
+        }
+        if (outcome === 'failed') {
+          if (isKakaoTalk()) {
+            setIsImageOpen(true)
+            return
+          }
           setToast({ tone: 'saved', id: Date.now(), message: t('imageSaveHint'), long: true })
         }
       },

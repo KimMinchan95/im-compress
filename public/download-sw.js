@@ -36,6 +36,7 @@ self.addEventListener('fetch', (event) => {
       headers: {
         'Content-Type': current.mime,
         'Content-Disposition': `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+        'Content-Length': String(current.buffer.byteLength),
         'Cache-Control': 'no-store',
         'X-Content-Type-Options': 'nosniff',
       },

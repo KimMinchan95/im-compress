@@ -80,18 +80,47 @@ export async function ensureMime(blob: Blob, mime: string) {
   return new Blob([await blob.arrayBuffer()], { type: mime })
 }
 
-function anchorDownload(url: string, filename: string) {
+function anchorDownload(url: string, filename: string, removeAfter = 0) {
   const anchor = document.createElement('a')
   anchor.href = url
   anchor.download = filename
   anchor.rel = 'noopener'
   document.body.appendChild(anchor)
   anchor.click()
-  anchor.remove()
+  window.setTimeout(() => anchor.remove(), removeAfter)
+}
+
+const KAKAO_DATA_URL_LIMIT = 12 * 1024 * 1024
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') resolve(reader.result)
+      else reject(new Error('data-url'))
+    }
+    reader.onerror = () => reject(reader.error ?? new Error('data-url'))
+    reader.readAsDataURL(blob)
+  })
+}
+
+async function saveInKakao(blob: Blob, url: string, filename: string): Promise<SaveOutcome> {
+  if (isIos()) {
+    if (blob.size > KAKAO_DATA_URL_LIMIT) return 'failed'
+    try {
+      anchorDownload(await blobToDataUrl(blob), filename, 1500)
+      return 'started'
+    } catch {
+      return 'failed'
+    }
+  }
+
+  anchorDownload(directDownloadUrl(filename) ?? url, filename)
+  return 'started'
 }
 
 export function saveFile(blob: Blob, url: string, filename: string, mime: string): Promise<SaveOutcome> {
-  if (isKakaoTalk()) return shareImage(blob, filename, mime)
+  if (isKakaoTalk()) return saveInKakao(blob, url, filename)
 
   if (isAndroid()) {
     const direct = directDownloadUrl(filename)
