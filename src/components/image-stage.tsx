@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from 'react'
 import { cycleChoice } from '../lib/cycle-choice'
 import { useI18n } from '../lib/use-i18n'
 import { useEditorStore } from '../store/editor-store'
@@ -57,13 +57,22 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
   const viewportRef = useRef<HTMLDivElement>(null)
   const shellRef = useRef<HTMLDivElement>(null)
   const originalRef = useRef<HTMLImageElement>(null)
+  const sliderRef = useRef<HTMLDivElement>(null)
   const anchorRef = useRef<ZoomAnchor | null>(null)
+  const splitRef = useRef(split)
+  const slidingRef = useRef(false)
+  const splitFrameRef = useRef(0)
+  const splitXRef = useRef<number | null>(null)
+  const splitMetricsRef = useRef<{ viewLeft: number; viewWidth: number; boxRight: number; boxWidth: number } | null>(null)
   const spaceRef = useRef(false)
   const panRef = useRef<{ x: number; y: number; left: number; top: number } | null>(null)
   const movedRef = useRef(false)
   const splitCentered = useRef(false)
   const [bounds, setBounds] = useState({ w: 0, h: 0 })
   const mode: CompareMode = resultUrl ? compareMode : 'original'
+  const modeRef = useRef(mode)
+  modeRef.current = mode
+  if (!slidingRef.current) splitRef.current = split
 
   useEffect(() => {
     const node = viewportRef.current
@@ -120,6 +129,7 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
     return () => {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
+      if (splitFrameRef.current) window.cancelAnimationFrame(splitFrameRef.current)
     }
   }, [])
 
@@ -139,27 +149,81 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
     anchorRef.current = null
   }, [shownH, shownW, zoom])
 
-  const moveSplit = (clientX: number) => {
-    const rect = viewportRef.current?.getBoundingClientRect()
-    if (!rect || rect.width === 0) return
-    const next = ((clientX - rect.left) / rect.width) * 100
-    setSplit(next)
+  const measureSplit = () => {
+    const view = viewportRef.current?.getBoundingClientRect()
+    const box = frameRef.current?.getBoundingClientRect()
+    if (!view || !box || view.width < 1 || box.width < 1) return null
+    return { viewLeft: view.left, viewWidth: view.width, boxRight: box.right, boxWidth: box.width }
   }
 
-  const syncClip = () => {
+  const paintSplit = (
+    percent: number,
+    metrics?: { viewLeft: number; viewWidth: number; boxRight: number; boxWidth: number } | null,
+  ) => {
+    const next = Math.min(100, Math.max(0, percent))
+    splitRef.current = next
+    const slider = sliderRef.current
+    if (slider) {
+      slider.style.left = `${next}%`
+      slider.setAttribute('aria-valuenow', String(Math.round(next)))
+      slider.setAttribute('aria-valuetext', `${Math.round(next)}%`)
+    }
     const image = originalRef.current
-    const viewport = viewportRef.current
-    const frame = frameRef.current
-    if (!image || !viewport || !frame || mode !== 'split') {
+    if (!image || modeRef.current !== 'split') {
       if (image) image.style.clipPath = ''
       return
     }
-    const view = viewport.getBoundingClientRect()
-    const box = frame.getBoundingClientRect()
-    if (view.width < 1 || box.width < 1) return
-    const screenX = view.left + (useStageStore.getState().split / 100) * view.width
-    const right = ((box.right - screenX) / box.width) * 100
+    const box = metrics ?? measureSplit()
+    if (!box) return
+    const screenX = box.viewLeft + (next / 100) * box.viewWidth
+    const right = Math.min(100, Math.max(0, ((box.boxRight - screenX) / box.boxWidth) * 100))
     image.style.clipPath = `inset(0 ${right}% 0 0)`
+  }
+
+  const moveSplit = (clientX: number) => {
+    const metrics = splitMetricsRef.current ?? measureSplit()
+    if (!metrics) return
+    paintSplit(((clientX - metrics.viewLeft) / metrics.viewWidth) * 100, metrics)
+  }
+
+  const queueSplit = (clientX: number) => {
+    splitXRef.current = clientX
+    if (splitFrameRef.current) return
+    splitFrameRef.current = window.requestAnimationFrame(() => {
+      splitFrameRef.current = 0
+      const nextX = splitXRef.current
+      splitXRef.current = null
+      if (nextX == null) return
+      moveSplit(nextX)
+    })
+  }
+
+  const finishSplit = () => {
+    if (splitFrameRef.current) {
+      window.cancelAnimationFrame(splitFrameRef.current)
+      splitFrameRef.current = 0
+    }
+    if (splitXRef.current != null) moveSplit(splitXRef.current)
+    splitXRef.current = null
+    splitMetricsRef.current = null
+    if (!slidingRef.current) return
+    slidingRef.current = false
+    setSplit(splitRef.current)
+  }
+
+  const beginSplit = (event: PointerEvent<HTMLElement>) => {
+    slidingRef.current = true
+    splitMetricsRef.current = measureSplit()
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      /* already released */
+    }
+    moveSplit(event.clientX)
+  }
+
+  const syncClip = () => {
+    paintSplit(splitRef.current)
   }
 
   const centerSplit = () => {
@@ -184,6 +248,11 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
   }, [mode, setSplit, shownH, shownW])
 
   useLayoutEffect(() => {
+    if (slidingRef.current) return
+    paintSplit(split)
+  }, [split])
+
+  useLayoutEffect(() => {
     const viewport = viewportRef.current
     const frame = frameRef.current
     if (!viewport || !frame || mode !== 'split') {
@@ -199,7 +268,7 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
       viewport.removeEventListener('scroll', syncClip)
       observer.disconnect()
     }
-  }, [mode, shownH, shownW, split, zoom])
+  }, [mode, shownH, shownW, zoom])
 
   const zoomBy = (factor: number) => {
     const viewport = viewportRef.current
@@ -269,7 +338,13 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
               <div
                 ref={frameRef}
                 className={`checker relative shrink-0 overflow-hidden ring-1 ring-line select-none ${
-                  mode === 'split' || zoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
+                  mode === 'split' ? 'touch-none ' : ''
+                }${
+                  mode === 'split' && zoom <= 1
+                    ? 'cursor-ew-resize'
+                    : mode === 'split' || zoom > 1
+                      ? 'cursor-grab active:cursor-grabbing'
+                      : 'cursor-pointer'
                 }`}
                 style={{ width: shownW, height: shownH }}
                 onClick={() => {
@@ -283,7 +358,11 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
                 onPointerDown={(event) => {
                   if ((event.target as HTMLElement).closest('[data-slider]')) return
                   if (event.button !== 0 && event.button !== 1) return
-                  const panning = event.button === 1 || spaceRef.current || mode === 'split' || zoom > 1
+                  if (mode === 'split' && event.button === 0 && !spaceRef.current && zoom <= 1) {
+                    beginSplit(event)
+                    return
+                  }
+                  const panning = event.button === 1 || spaceRef.current || zoom > 1
                   if (!panning) return
                   const viewport = viewportRef.current
                   if (!viewport) return
@@ -297,6 +376,10 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
                   event.currentTarget.setPointerCapture(event.pointerId)
                 }}
                 onPointerMove={(event) => {
+                  if (slidingRef.current) {
+                    queueSplit(event.clientX)
+                    return
+                  }
                   if (!panRef.current || !viewportRef.current) return
                   const dx = event.clientX - panRef.current.x
                   const dy = event.clientY - panRef.current.y
@@ -305,6 +388,14 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
                   viewportRef.current.scrollTop = panRef.current.top - dy
                 }}
                 onPointerUp={() => {
+                  if (slidingRef.current) {
+                    finishSplit()
+                    return
+                  }
+                  panRef.current = null
+                }}
+                onPointerCancel={() => {
+                  if (slidingRef.current) finishSplit()
                   panRef.current = null
                 }}
               >
@@ -333,6 +424,7 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
         </div>
         {mode === 'split' ? (
           <div
+            ref={sliderRef}
             data-slider=""
             role="slider"
             tabIndex={0}
@@ -341,17 +433,19 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
             aria-valuemax={100}
             aria-valuenow={Math.round(split)}
             aria-valuetext={`${Math.round(split)}%`}
-            className="absolute inset-y-0 z-30 w-3 -translate-x-1/2 cursor-ew-resize touch-none outline-none"
-            style={{ left: `${split}%` }}
+            className="absolute inset-y-0 z-30 w-11 -translate-x-1/2 cursor-ew-resize touch-none outline-none"
+            style={{ left: `${splitRef.current}%` }}
             onPointerDown={(event) => {
               event.stopPropagation()
-              event.currentTarget.setPointerCapture(event.pointerId)
-              moveSplit(event.clientX)
+              event.preventDefault()
+              beginSplit(event)
             }}
             onPointerMove={(event) => {
-              if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
-              moveSplit(event.clientX)
+              if (!slidingRef.current) return
+              queueSplit(event.clientX)
             }}
+            onPointerUp={finishSplit}
+            onPointerCancel={finishSplit}
             onKeyDown={(event) => {
               if (event.key === 'ArrowLeft') {
                 event.preventDefault()
