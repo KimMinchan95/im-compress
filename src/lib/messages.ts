@@ -40,7 +40,7 @@ const ko = {
   imageSaveHint: '이미지를 길게 눌러 사진 앱에 저장해 주세요.',
   kakaoDownload: '카카오톡에서는 저장이 안 될 수 있어요. 안 되면 브라우저에서 열어 주세요.',
   openBrowser: '브라우저에서 열기',
-  encoding: '줄이는 중',
+  encoding: '작업하는 중...',
   original: '원본',
   compressed: '압축본',
   calculating: '계산 중',
