@@ -9,9 +9,10 @@ import { CloseIcon } from './icons'
 
 interface PresetDialogProps {
   onClose: () => void
+  onApply?: (preset: SavedPreset) => void
 }
 
-export function PresetDialog({ onClose }: PresetDialogProps) {
+export function PresetDialog({ onClose, onApply }: PresetDialogProps) {
   const { t } = useI18n()
   const dialogRef = useRef<HTMLDivElement>(null)
   const presets = usePresets((state) => state.presets)
@@ -30,7 +31,8 @@ export function PresetDialog({ onClose }: PresetDialogProps) {
   }, [onClose])
 
   const apply = (preset: SavedPreset) => {
-    applySettings(preset)
+    if (onApply) onApply(preset)
+    else applySettings(preset)
     onClose()
   }
 

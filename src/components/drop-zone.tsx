@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react'
-import { FILE_ACCEPT, takeFile } from '../lib/files'
+import { FILE_ACCEPT, takeFiles } from '../lib/files'
+import { openIncoming } from '../lib/open-incoming'
 import { errorMessage } from '../lib/error-message'
 import { useI18n } from '../lib/use-i18n'
 import { useEditorStore } from '../store/editor-store'
@@ -22,7 +23,6 @@ const LINKS: ContactLink[] = [
 export function DropZone() {
   const error = useEditorStore((state) => state.error)
   const isReading = useEditorStore((state) => state.isReading)
-  const loadFile = useEditorStore((state) => state.loadFile)
   const { locale, t } = useI18n()
 
   return (
@@ -82,17 +82,16 @@ export function DropZone() {
               <input
                 type="file"
                 accept={FILE_ACCEPT}
+                multiple
                 className="sr-only"
-                onChange={(event) => {
-                  const file = takeFile(event.currentTarget)
-                  if (file) void loadFile(file)
-                }}
+                onChange={(event) => openIncoming(takeFiles(event.currentTarget))}
               />
               <span className={`grid h-16 w-16 place-items-center rounded-2xl bg-accent text-3xl font-semibold text-on-accent ${isReading ? 'animate-pulse' : 'bob'}`}>
                 +
               </span>
               <span className="mt-6 break-keep text-2xl font-semibold">{isReading ? t('dropReading') : t('dropTitle')}</span>
               <span className="mt-2 text-sm text-muted">{t('dropHint')}</span>
+              <span className="mt-1 text-sm text-muted">{t('dropMany')}</span>
             </label>
           </div>
         </div>

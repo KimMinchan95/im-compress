@@ -7,11 +7,13 @@ interface NumberFieldProps {
   allowDecimal?: boolean
   decimals?: number
   live?: boolean
+  blankZero?: boolean
   disabled?: boolean
   onChange: (value: number) => void
 }
 
-function formatField(value: number, places: number) {
+function formatField(value: number, places: number, blankZero = false) {
+  if (blankZero && value === 0) return ''
   if (places <= 0) return String(Math.round(value))
   const factor = 10 ** places
   const rounded = Math.round(value * factor) / factor
@@ -33,18 +35,19 @@ export function NumberField({
   allowDecimal = false,
   decimals,
   live = true,
+  blankZero = false,
   disabled = false,
   onChange,
 }: NumberFieldProps) {
   const places = decimals ?? (allowDecimal ? 1 : 0)
-  const [text, setText] = useState(() => formatField(value, places))
+  const [text, setText] = useState(() => formatField(value, places, blankZero))
   const [blurCount, setBlurCount] = useState(0)
   const isFocused = useRef(false)
 
   useEffect(() => {
     if (isFocused.current) return
-    setText(formatField(value, places))
-  }, [blurCount, places, value])
+    setText(formatField(value, places, blankZero))
+  }, [blankZero, blurCount, places, value])
 
   return (
     <label className={`flex min-w-0 flex-col gap-2 ${disabled ? 'opacity-40' : ''}`}>
@@ -72,6 +75,10 @@ export function NumberField({
             const partial = places > 0 ? new RegExp(`^\\d*\\.?\\d{0,${places}}$`) : /^\d*$/
             if (!partial.test(nextText)) return
             setText(nextText)
+            if (blankZero && nextText === '') {
+              onChange(0)
+              return
+            }
             if (!live) return
             const next = parseField(nextText, places)
             if (next !== null) onChange(next)

@@ -1,14 +1,17 @@
-import { FILE_ACCEPT, takeFile } from '../lib/files'
+import { FILE_ACCEPT, takeFile, takeFiles } from '../lib/files'
+import { openIncoming } from '../lib/open-incoming'
 import { useI18n } from '../lib/use-i18n'
 import { useResolvedTheme } from '../lib/use-theme'
+import { useBatchStore } from '../store/batch-store'
 import { useEditorStore } from '../store/editor-store'
 import { usePreferences } from '../store/preferences-store'
 import { ExitIcon, MoonIcon, ReplaceIcon, SunIcon } from './icons'
 
 export function Header() {
   const hasSource = useEditorStore((state) => state.source !== null)
-  const loadFile = useEditorStore((state) => state.loadFile)
   const leave = useEditorStore((state) => state.leave)
+  const hasBatch = useBatchStore((state) => state.items.length > 0 || state.isOpening)
+  const editingBatch = useBatchStore((state) => state.editingId !== null)
   const locale = usePreferences((state) => state.locale)
   const setTheme = usePreferences((state) => state.setTheme)
   const setLocale = usePreferences((state) => state.setLocale)
@@ -19,11 +22,21 @@ export function Header() {
   return (
     <header className="flex shrink-0 items-center justify-between gap-2 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 md:pt-[max(1rem,env(safe-area-inset-top))] md:pb-4">
       <div className="flex min-w-0 items-center gap-2.5">
-        {hasSource ? (
+        {hasSource || hasBatch ? (
           <button
             type="button"
-            aria-label={t('leave')}
-            onClick={leave}
+            aria-label={editingBatch ? t('backToList') : t('leave')}
+            onClick={() => {
+              if (editingBatch) {
+                useBatchStore.getState().commitEdit()
+                return
+              }
+              if (hasSource) {
+                leave()
+                return
+              }
+              useBatchStore.getState().close()
+            }}
             className="grid h-10 w-10 cursor-pointer place-items-center rounded-full text-muted transition duration-200 hover:bg-sunken hover:text-cream active:scale-95"
           >
             <ExitIcon className="h-4 w-4" />
@@ -72,8 +85,19 @@ export function Header() {
                 className="sr-only"
                 onChange={(event) => {
                   const file = takeFile(event.currentTarget)
-                  if (file) void loadFile(file)
+                  if (file) openIncoming([file])
                 }}
+              />
+            </label>
+          ) : hasBatch ? (
+            <label className="flex h-10 cursor-pointer items-center justify-center rounded-full bg-sunken px-3 text-sm font-semibold ring-1 ring-line">
+              {t('addImages')}
+              <input
+                type="file"
+                accept={FILE_ACCEPT}
+                multiple
+                className="sr-only"
+                onChange={(event) => openIncoming(takeFiles(event.currentTarget))}
               />
             </label>
           ) : null}

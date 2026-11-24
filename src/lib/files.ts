@@ -171,6 +171,35 @@ export function takeFile(input: HTMLInputElement) {
   return file
 }
 
+export function takeFiles(input: HTMLInputElement) {
+  const files = Array.from(input.files ?? [])
+  input.value = ''
+  return files
+}
+
+export async function saveDownload(blob: Blob, filename: string): Promise<SaveOutcome> {
+  if (isKakaoTalk()) return saveInKakao(blob, filename)
+  if (isIos()) {
+    const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' })
+    if (typeof navigator.share === 'function') {
+      try {
+        const allowed = typeof navigator.canShare !== 'function' || navigator.canShare({ files: [file] })
+        if (allowed) {
+          await navigator.share({ files: [file] })
+          return 'saved'
+        }
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return 'cancelled'
+      }
+    }
+  }
+
+  const url = URL.createObjectURL(blob)
+  anchorDownload(url, filename)
+  window.setTimeout(() => URL.revokeObjectURL(url), 30000)
+  return 'started'
+}
+
 export function isResultCurrent(
   result: EncodeResult,
   options: { format: OutputFormat; width: number; height: number; quality: number },

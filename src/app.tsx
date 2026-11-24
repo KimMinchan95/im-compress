@@ -1,14 +1,18 @@
 import { useEffect } from 'react'
+import { BatchView } from './components/batch-view'
 import { Controls } from './components/controls'
 import { DropZone } from './components/drop-zone'
 import { Header } from './components/header'
 import { Preview } from './components/preview'
+import { useBatchRunner } from './lib/batch-runner'
 import { paintDocumentTheme } from './lib/document-theme'
 import { isKakaoTalk, kakaoExternalUrl, leaveKakaoOnce } from './lib/files'
+import { openIncoming } from './lib/open-incoming'
 import { useFileDrop } from './lib/use-file-drop'
 import { useI18n } from './lib/use-i18n'
 import { useEncoder } from './lib/use-encoder'
 import { useHydrated, useResolvedTheme } from './lib/use-theme'
+import { useBatchStore } from './store/batch-store'
 import { useEditorStore } from './store/editor-store'
 import { usePreferences } from './store/preferences-store'
 
@@ -19,6 +23,7 @@ const DOCUMENT_TITLE = {
 
 function EncodeBridge() {
   useEncoder()
+  useBatchRunner()
   return null
 }
 
@@ -59,11 +64,9 @@ function ThemeSync() {
 
 export default function App() {
   const hasSource = useEditorStore((state) => state.source !== null)
-  const loadFile = useEditorStore((state) => state.loadFile)
+  const showBatch = useBatchStore((state) => state.items.length > 0 || state.isOpening)
   const { t } = useI18n()
-  const { isDragging, dropHandlers } = useFileDrop((file) => {
-    void loadFile(file)
-  })
+  const { isDragging, dropHandlers } = useFileDrop(openIncoming)
 
   return (
     <div
@@ -72,7 +75,7 @@ export default function App() {
     >
       <ThemeSync />
       <EncodeBridge />
-      {hasSource ? null : (
+      {hasSource || showBatch ? null : (
         <div className="pointer-events-none absolute inset-0" aria-hidden="true">
           <div className="orb orb-a" />
           <div className="orb orb-b" />
@@ -86,6 +89,8 @@ export default function App() {
             <Preview />
             <Controls />
           </div>
+        ) : showBatch ? (
+          <BatchView />
         ) : (
           <DropZone />
         )}

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { sizeFromHeight, sizeFromScale, sizeFromWidth } from '../lib/aspect'
 import { isSupportedFile } from '../lib/files'
-import type { CompareMode, EditorErrorCode, EncodeResult, EncodeStatus, OutputFormat, SizeMode, SourceImage } from '../types'
+import type { CompareMode, CompressSettings, EditorErrorCode, EncodeResult, EncodeStatus, OutputFormat, SizeMode, SourceImage } from '../types'
 import { usePresets } from './preset-store'
 import { useStageStore } from './stage-store'
 
@@ -23,7 +23,7 @@ interface EditorStore {
   error: EditorErrorCode | null
   isReading: boolean
   retryToken: number
-  loadFile: (file: File) => Promise<void>
+  loadFile: (file: File, settings?: CompressSettings) => Promise<boolean>
   setFormat: (format: OutputFormat) => void
   setQuality: (quality: number) => void
   setWidth: (width: number) => void
@@ -84,10 +84,10 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   isReading: false,
   retryToken: 0,
 
-  loadFile: async (file) => {
+  loadFile: async (file, settings) => {
     if (!isSupportedFile(file)) {
       set({ error: 'unsupported' })
-      return
+      return false
     }
 
     set({ isReading: true, error: null })
@@ -104,9 +104,10 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       const current = get()
       releaseMedia(current)
       const { presets, defaultId } = usePresets.getState()
-      const preset = presets.find((item) => item.id === defaultId) ?? null
-      const sized =
-        preset?.sizeMode === 'dimensions' ? sizeFromScale(width, height, preset.scale) : fitted
+      const preset = settings ? null : presets.find((item) => item.id === defaultId) ?? null
+      const sizeMode = settings?.sizeMode ?? preset?.sizeMode ?? 'dimensions'
+      const scale = settings?.scale ?? preset?.scale ?? 100
+      const sized = sizeMode === 'dimensions' ? sizeFromScale(width, height, scale) : fitted
 
       set({
         source: {
@@ -117,13 +118,13 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
           url: URL.createObjectURL(file),
           blob: file,
         },
-        format: preset?.format ?? 'jpeg',
-        quality: preset?.quality ?? DEFAULT_QUALITY,
+        format: settings?.format ?? preset?.format ?? 'jpeg',
+        quality: settings?.quality ?? preset?.quality ?? DEFAULT_QUALITY,
         width: sized.width,
         height: sized.height,
         scale: sized.scale,
-        sizeMode: preset?.sizeMode ?? 'dimensions',
-        targetBytes: preset?.sizeMode === 'bytes' ? preset.targetBytes : null,
+        sizeMode,
+        targetBytes: sizeMode === 'bytes' ? settings?.targetBytes ?? preset?.targetBytes ?? null : null,
         matchedTarget: null,
         result: null,
         status: 'idle',
@@ -131,11 +132,13 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         isReading: false,
       })
       useStageStore.getState().reset()
+      return true
     } catch {
       set({
         isReading: false,
         error: 'unreadable',
       })
+      return false
     }
   },
 

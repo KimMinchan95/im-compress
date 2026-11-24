@@ -8,6 +8,14 @@ export type CompareMode = 'original' | 'result' | 'split'
 
 export type EditorErrorCode = 'unsupported' | 'unreadable' | 'encode-failed'
 
+export interface CompressSettings {
+  format: OutputFormat
+  quality: number
+  scale: number
+  sizeMode: SizeMode
+  targetBytes: number | null
+}
+
 export interface SourceImage {
   name: string
   bytes: number

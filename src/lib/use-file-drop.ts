@@ -4,7 +4,7 @@ function hasFileDrop(types: DataTransfer['types']) {
   return Array.from(types).includes('Files')
 }
 
-export function useFileDrop(onFile: (file: File) => void) {
+export function useFileDrop(onFiles: (files: File[]) => void) {
   const [isDragging, setIsDragging] = useState(false)
   const depth = useRef(0)
 
@@ -33,8 +33,8 @@ export function useFileDrop(onFile: (file: File) => void) {
     event.preventDefault()
     depth.current = 0
     setIsDragging(false)
-    const file = event.dataTransfer.files[0]
-    if (file) onFile(file)
+    const files = Array.from(event.dataTransfer.files)
+    if (files.length > 0) onFiles(files)
   }
 
   return {
