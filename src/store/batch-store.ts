@@ -70,7 +70,7 @@ let requestId = 0
 
 export function sameSettings(left: CompressSettings, right: CompressSettings) {
   if (left.format !== right.format || left.sizeMode !== right.sizeMode) return false
-  if (left.format !== 'png' && left.quality !== right.quality) return false
+  if (left.quality !== right.quality) return false
   if (left.sizeMode === 'bytes') return left.targetBytes === right.targetBytes
   return Math.abs(left.scale - right.scale) < 0.2
 }

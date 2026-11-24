@@ -132,8 +132,7 @@ function presetSummary(preset: SavedPreset, t: ReturnType<typeof useI18n>['t']) 
     preset.sizeMode === 'bytes' && preset.targetBytes
       ? t('presetBytes')(formatBytes(preset.targetBytes))
       : t('presetScale')(formatScale(preset.scale))
-  const parts = [`${t('format')}: ${FORMAT_META[preset.format].label}`]
-  if (preset.format !== 'png') parts.push(`${t('quality')}: ${preset.quality}%`)
+  const parts = [`${t('format')}: ${FORMAT_META[preset.format].label}`, `${t('quality')}: ${preset.quality}%`]
   parts.push(size)
   return parts.join(' · ')
 }

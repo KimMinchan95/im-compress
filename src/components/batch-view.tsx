@@ -117,14 +117,12 @@ export function BatchView() {
                 </button>
               ))}
             </div>
-            {settings.format === 'png' ? (
-              <p className="rounded-2xl bg-panel px-4 py-3 text-sm text-muted">{t('pngLossless')}</p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold">{t('quality')}</h3>
-                  <span className="text-2xl font-semibold tabular-nums">{settings.quality}%</span>
-                </div>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">{t('quality')}</h3>
+                <span className="text-2xl font-semibold tabular-nums">{settings.quality}%</span>
+              </div>
+              {settings.format === 'png' ? <p className="text-sm text-muted">{t('pngHint')}</p> : null}
                 <div className="grid grid-cols-4 gap-2">
                   {QUALITY_PRESETS.map((preset) => (
                     <button
@@ -154,8 +152,7 @@ export function BatchView() {
                     backgroundImage: `linear-gradient(to right, var(--accent) ${settings.quality}%, var(--line) ${settings.quality}%)`,
                   }}
                 />
-              </div>
-            )}
+            </div>
             <div className="grid grid-cols-2 gap-1 rounded-2xl bg-panel p-1 ring-1 ring-line">
               <button
                 type="button"
@@ -410,7 +407,7 @@ function BatchRow({
   const savings = ready && result ? savingsOf(item.bytes, result.bytes) : null
   const detail = [
     FORMAT_META[item.settings.format].label,
-    item.settings.format === 'png' ? null : `${item.settings.quality}%`,
+    `${item.settings.quality}%`,
     ready && result ? `${formatBytes(item.bytes)} → ${formatBytes(result.bytes)}` : item.status === 'error' ? t('encodeFailed') : t('batchWorking'),
   ]
     .filter(Boolean)

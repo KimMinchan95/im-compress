@@ -229,47 +229,38 @@ export function Controls() {
             <ControlCard
               title={t('quality')}
               delay={210}
-              extra={
-                format === 'png' ? null : (
-                  <span className="text-3xl font-semibold tabular-nums leading-none">{quality}%</span>
-                )
-              }
+              extra={<span className="text-3xl font-semibold tabular-nums leading-none">{quality}%</span>}
             >
-              {format === 'png' ? (
-                <p className="rounded-2xl bg-panel px-4 py-3 text-sm text-muted">{t('pngLossless')}</p>
-              ) : (
-                <>
-                  <div className="grid grid-cols-4 gap-2">
-                    {QUALITY_PRESETS.map((preset) => (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        aria-pressed={quality === preset.value}
-                        onClick={() => setQuality(preset.value)}
-                        className={`h-11 cursor-pointer rounded-xl text-sm font-semibold transition duration-200 active:scale-[0.97] ${
-                          quality === preset.value ? 'bg-cream text-ink' : 'bg-panel text-muted hover:-translate-y-0.5 hover:text-cream'
-                        }`}
-                      >
-                        {t(preset.id)}
-                      </button>
-                    ))}
-                  </div>
-                  <input
-                    type="range"
-                    min={1}
-                    max={100}
-                    step={1}
-                    value={quality}
-                    aria-label={t('quality')}
-                    aria-valuetext={`${quality}%`}
-                    onChange={(event) => setQuality(Number(event.target.value))}
-                    className="quality-slider mt-1"
-                    style={{
-                      backgroundImage: `linear-gradient(to right, var(--accent) ${quality}%, var(--line) ${quality}%)`,
-                    }}
-                  />
-                </>
-              )}
+              <div className="grid grid-cols-4 gap-2">
+                {QUALITY_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    aria-pressed={quality === preset.value}
+                    onClick={() => setQuality(preset.value)}
+                    className={`h-11 cursor-pointer rounded-xl text-sm font-semibold transition duration-200 active:scale-[0.97] ${
+                      quality === preset.value ? 'bg-cream text-ink' : 'bg-panel text-muted hover:-translate-y-0.5 hover:text-cream'
+                    }`}
+                  >
+                    {t(preset.id)}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={100}
+                step={1}
+                value={quality}
+                aria-label={t('quality')}
+                aria-valuetext={`${quality}%`}
+                onChange={(event) => setQuality(Number(event.target.value))}
+                className="quality-slider mt-1"
+                style={{
+                  backgroundImage: `linear-gradient(to right, var(--accent) ${quality}%, var(--line) ${quality}%)`,
+                }}
+              />
+              {format === 'png' ? <p className="text-sm text-muted">{t('pngHint')}</p> : null}
             </ControlCard>
 
             <ControlCard

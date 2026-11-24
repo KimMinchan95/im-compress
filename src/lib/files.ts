@@ -224,6 +224,6 @@ export function isResultCurrent(
 ) {
   if (result.format !== options.format) return false
   if (result.width !== options.width || result.height !== options.height) return false
-  if (options.format !== 'png' && result.quality !== options.quality) return false
+  if (result.quality !== options.quality) return false
   return true
 }

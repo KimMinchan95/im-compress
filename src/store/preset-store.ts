@@ -31,9 +31,7 @@ function createId() {
 type PresetDraft = Pick<SavedPreset, 'format' | 'quality' | 'scale' | 'sizeMode' | 'targetBytes'>
 
 export function presetName(format: OutputFormat, quality: number) {
-  const label = FORMAT_META[format].label
-  if (format === 'png') return label
-  return `${label} ${quality}%`
+  return `${FORMAT_META[format].label} ${quality}%`
 }
 
 export function formatScale(scale: number) {
