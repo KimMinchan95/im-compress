@@ -17,8 +17,8 @@ interface ContactLink {
 
 const LINKS: ContactLink[] = [
   { href: 'mailto:hialscks@gmail.com', label: 'email', icon: MailIcon },
-  { href: 'https://www.instagram.com/chan_pest/', label: 'instagram', icon: InstagramIcon, external: true },
   { href: 'https://github.com/KimMinchan95/im-compress', label: 'github', icon: GitHubIcon, external: true },
+  { href: 'https://www.instagram.com/chan_pest/', label: 'instagram', icon: InstagramIcon, external: true },
 ]
 
 export function DropZone() {
@@ -39,7 +39,8 @@ export function DropZone() {
               {t('heroTitle')}
             </h1>
             <p className="rise mx-auto mt-4 max-w-xl break-keep text-base text-muted md:mx-0" style={{ animationDelay: '150ms' }}>
-              {t('heroBody')}
+              <span className="block">{t('heroBody')}</span>
+              <span className="mt-1 block">{t('heroCompare')}</span>
             </p>
           </div>
           <div className="order-4 text-center md:order-none md:mt-8 md:text-left">
