@@ -58,40 +58,48 @@ function isFormat(value: unknown): value is OutputFormat {
   return value === 'jpeg' || value === 'webp' || value === 'png'
 }
 
-export const usePresets = create<PresetState>()(
-  persist(
-    (set, get) => ({
-      presets: [],
-      defaultId: null,
-      savePreset: (input) => {
-        if (get().presets.length >= PRESET_LIMIT) return 'limit'
-        const targetBytes = input.sizeMode === 'bytes' ? input.targetBytes : null
-        const name =
-          input.name.trim().slice(0, 40) ||
-          presetName(input.format, input.quality)
-        const preset: SavedPreset = {
-          id: createId(),
-          name,
-          format: input.format,
-          quality: input.quality,
-          scale: input.scale,
-          sizeMode: input.sizeMode,
-          targetBytes,
-        }
-        set({ presets: [preset, ...get().presets] })
-        return 'saved'
+export const usePresets = createPresetStore('im-compress-presets')
+export const useBatchPresets = createPresetStore('im-compress-batch-presets')
+
+function createPresetStore(storageKey: string) {
+  return create<PresetState>()(
+    persist(
+      (set, get) => ({
+        presets: [],
+        defaultId: null,
+        savePreset: (input) => {
+          if (get().presets.length >= PRESET_LIMIT) return 'limit'
+          const targetBytes = input.sizeMode === 'bytes' ? input.targetBytes : null
+          const name = input.name.trim().slice(0, 40) || presetName(input.format, input.quality)
+          const preset: SavedPreset = {
+            id: createId(),
+            name,
+            format: input.format,
+            quality: input.quality,
+            scale: input.scale,
+            sizeMode: input.sizeMode,
+            targetBytes,
+          }
+          set({ presets: [preset, ...get().presets] })
+          return 'saved'
+        },
+        removePreset: (id) =>
+          set({
+            presets: get().presets.filter((preset) => preset.id !== id),
+            defaultId: get().defaultId === id ? null : get().defaultId,
+          }),
+        setDefault: (id) => set({ defaultId: get().defaultId === id ? null : id }),
+      }),
+      {
+        name: storageKey,
+        version: 2,
+        migrate,
       },
-      removePreset: (id) =>
-        set({
-          presets: get().presets.filter((preset) => preset.id !== id),
-          defaultId: get().defaultId === id ? null : get().defaultId,
-        }),
-      setDefault: (id) => set({ defaultId: get().defaultId === id ? null : id }),
-    }),
-    {
-      name: 'im-compress-presets',
-      version: 2,
-      migrate: (persisted) => {
+    ),
+  )
+}
+
+function migrate(persisted: unknown) {
         const state = (persisted ?? {}) as { presets?: Array<Partial<SavedPreset>>; defaultId?: string | null }
         const presets = (state.presets ?? []).flatMap((preset) => {
           if (!preset.id || !preset.name || !isFormat(preset.format)) return []
@@ -111,7 +119,4 @@ export const usePresets = create<PresetState>()(
         })
         const defaultId = presets.some((preset) => preset.id === state.defaultId) ? state.defaultId ?? null : null
         return { presets, defaultId }
-      },
-    },
-  ),
-)
+}

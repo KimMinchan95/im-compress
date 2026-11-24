@@ -3,7 +3,7 @@ import { isResultCurrent, isSupportedFile } from '../lib/files'
 import { readImage } from '../lib/read-image'
 import type { CompressSettings, OutputFormat } from '../types'
 import { useEditorStore } from './editor-store'
-import { usePresets } from './preset-store'
+import { useBatchPresets } from './preset-store'
 
 export type BatchStatus = 'queued' | 'encoding' | 'done' | 'error'
 
@@ -88,7 +88,7 @@ function cleanSettings(settings: CompressSettings, scaleCap: number): CompressSe
 }
 
 function presetSettings() {
-  const { presets, defaultId } = usePresets.getState()
+  const { presets, defaultId } = useBatchPresets.getState()
   const preset = presets.find((item) => item.id === defaultId)
   if (!preset) return DEFAULTS
   return cleanSettings(

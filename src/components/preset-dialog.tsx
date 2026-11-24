@@ -4,21 +4,30 @@ import { FORMAT_META } from '../lib/files'
 import { formatBytes } from '../lib/format-bytes'
 import { useI18n } from '../lib/use-i18n'
 import { useEditorStore } from '../store/editor-store'
-import { formatScale, usePresets, type SavedPreset } from '../store/preset-store'
+import { formatScale, useBatchPresets, usePresets, type SavedPreset } from '../store/preset-store'
 import { CloseIcon } from './icons'
 
 interface PresetDialogProps {
   onClose: () => void
   onApply?: (preset: SavedPreset) => void
+  list?: 'single' | 'batch'
 }
 
-export function PresetDialog({ onClose, onApply }: PresetDialogProps) {
+export function PresetDialog({ onClose, onApply, list = 'single' }: PresetDialogProps) {
   const { t } = useI18n()
   const dialogRef = useRef<HTMLDivElement>(null)
-  const presets = usePresets((state) => state.presets)
-  const defaultId = usePresets((state) => state.defaultId)
-  const removePreset = usePresets((state) => state.removePreset)
-  const setDefault = usePresets((state) => state.setDefault)
+  const singlePresets = usePresets((state) => state.presets)
+  const batchPresets = useBatchPresets((state) => state.presets)
+  const singleDefaultId = usePresets((state) => state.defaultId)
+  const batchDefaultId = useBatchPresets((state) => state.defaultId)
+  const removeSingle = usePresets((state) => state.removePreset)
+  const removeBatch = useBatchPresets((state) => state.removePreset)
+  const setSingleDefault = usePresets((state) => state.setDefault)
+  const setBatchDefault = useBatchPresets((state) => state.setDefault)
+  const presets = list === 'batch' ? batchPresets : singlePresets
+  const defaultId = list === 'batch' ? batchDefaultId : singleDefaultId
+  const removePreset = list === 'batch' ? removeBatch : removeSingle
+  const setDefault = list === 'batch' ? setBatchDefault : setSingleDefault
   const applySettings = useEditorStore((state) => state.applySettings)
 
   useEffect(() => {

@@ -1,10 +1,12 @@
 import { useEffect, useState, type CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 import { byteFieldValue } from '../lib/byte-field'
 import { formatBytes, savingsOf } from '../lib/format-bytes'
 import { FORMAT_META, FORMATS, QUALITY_PRESETS, downloadName, fileStem, isKakaoTalk, saveDownload } from '../lib/files'
 import { useI18n } from '../lib/use-i18n'
 import { zipStored } from '../lib/zip'
 import { sameSettings, useBatchStore, type BatchItem } from '../store/batch-store'
+import { isSamePreset, presetName, useBatchPresets } from '../store/preset-store'
 import { ChevronIcon, CloseIcon } from './icons'
 import { NumberField } from './number-field'
 import { PresetDialog } from './preset-dialog'
@@ -23,6 +25,9 @@ export function BatchView() {
   const setSizeMode = useBatchStore((state) => state.setSizeMode)
   const setTargetBytes = useBatchStore((state) => state.setTargetBytes)
   const applyShared = useBatchStore((state) => state.applyShared)
+  const presets = useBatchPresets((state) => state.presets)
+  const savePreset = useBatchPresets((state) => state.savePreset)
+  const [toast, setToast] = useState<{ tone: 'saved' | 'limit'; id: number } | null>(null)
   const openItem = useBatchStore((state) => state.openItem)
   const retryItem = useBatchStore((state) => state.retryItem)
   const removeItem = useBatchStore((state) => state.removeItem)
@@ -33,6 +38,30 @@ export function BatchView() {
   const done = items.filter((item) => isReady(item)).length
   const isBytes = settings.sizeMode === 'bytes'
   const bytesValue = settings.targetBytes == null ? 0 : byteFieldValue(settings.targetBytes, byteUnit)
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = window.setTimeout(() => setToast(null), toast.tone === 'saved' ? 1800 : 2600)
+    return () => window.clearTimeout(timer)
+  }, [toast])
+
+  const saveCurrent = () => {
+    const latest = useBatchStore.getState().settings
+    const targetBytes = latest.sizeMode === 'bytes' && latest.targetBytes != null ? Math.max(1, Math.round(latest.targetBytes)) : null
+    const draft = {
+      format: latest.format,
+      quality: latest.quality,
+      scale: latest.scale,
+      sizeMode: latest.sizeMode,
+      targetBytes,
+    }
+    const alreadySaved = useBatchPresets.getState().presets.some((preset) => isSamePreset(preset, draft))
+    if (alreadySaved) {
+      setToast({ tone: 'saved', id: Date.now() })
+      return
+    }
+    setToast({ tone: savePreset({ name: presetName(latest.format, latest.quality), ...draft }), id: Date.now() })
+  }
 
   const downloadZip = async () => {
     const ready = items.filter(isReady)
@@ -72,16 +101,7 @@ export function BatchView() {
           </div>
 
           <section className="flex flex-col gap-4 rounded-3xl bg-sunken p-3 ring-1 ring-line md:p-4">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-base font-semibold">{t('settings')}</h2>
-              <button
-                type="button"
-                onClick={() => setIsPresetOpen(true)}
-                className="h-9 cursor-pointer rounded-full bg-panel px-3 text-sm font-semibold ring-1 ring-line"
-              >
-                {t('loadSettings')}
-              </button>
-            </div>
+            <h2 className="text-base font-semibold">{t('settings')}</h2>
             <div className="grid grid-cols-3 gap-2">
               {FORMATS.map((format) => (
                 <button
@@ -196,6 +216,25 @@ export function BatchView() {
                 </button>
               </div>
             )}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                aria-expanded={isPresetOpen}
+                onClick={() => setIsPresetOpen(true)}
+                className="h-10 cursor-pointer rounded-full border border-line bg-panel text-sm font-semibold transition duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
+              >
+                {t('loadSettings')}
+                {presets.length > 0 ? <span className="ml-1.5 text-muted">{presets.length}</span> : null}
+              </button>
+              <button
+                type="button"
+                onClick={saveCurrent}
+                className="h-10 cursor-pointer rounded-full border border-line bg-panel text-sm font-semibold transition duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
+              >
+                {t('saveSettings')}
+              </button>
+            </div>
           </section>
 
           <BatchReel items={items} onOpen={openItem} onRetry={retryItem} onRemove={removeItem} />
@@ -216,6 +255,7 @@ export function BatchView() {
       </div>
       {isPresetOpen ? (
         <PresetDialog
+          list="batch"
           onClose={() => setIsPresetOpen(false)}
           onApply={(preset) =>
             applyShared({
@@ -228,6 +268,21 @@ export function BatchView() {
           }
         />
       ) : null}
+      {toast
+        ? createPortal(
+            <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[60] flex justify-center px-4">
+              <p
+                role="status"
+                className={`overlay-in rounded-full px-4 py-2.5 text-sm font-semibold shadow-[0_12px_40px_rgba(0,0,0,0.28)] ${
+                  toast.tone === 'limit' ? 'bg-accent text-on-accent' : 'bg-cream text-ink'
+                }`}
+              >
+                {toast.tone === 'limit' ? t('presetLimit') : t('presetSaved')}
+              </p>
+            </div>,
+            document.body,
+          )
+        : null}
     </main>
   )
 }
@@ -373,7 +428,7 @@ function BatchRow({
       >
         <span className="relative aspect-[4/3] overflow-hidden">
           <img
-            src={item.thumbUrl}
+            src={result?.url ?? item.thumbUrl}
             alt=""
             className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]"
           />
