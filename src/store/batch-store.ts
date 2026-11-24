@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { isResultCurrent, isSupportedFile } from '../lib/files'
+import { readImage } from '../lib/read-image'
 import type { CompressSettings, OutputFormat } from '../types'
 import { useEditorStore } from './editor-store'
 import { usePresets } from './preset-store'
@@ -20,6 +21,7 @@ export interface BatchResult {
 export interface BatchItem {
   id: string
   file: File
+  bitmap: Blob
   name: string
   bytes: number
   width: number
@@ -114,19 +116,16 @@ function releaseItem(item: BatchItem) {
 async function readItem(file: File, settings: CompressSettings) {
   if (!isSupportedFile(file)) return null
   try {
-    const bitmap = await createImageBitmap(file)
-    const width = bitmap.width
-    const height = bitmap.height
-    bitmap.close()
-    if (width < 1 || height < 1) return null
+    const opened = await readImage(file)
     return {
       id: createId(),
       file,
+      bitmap: opened.blob,
       name: file.name,
       bytes: file.size,
-      width,
-      height,
-      thumbUrl: URL.createObjectURL(file),
+      width: opened.width,
+      height: opened.height,
+      thumbUrl: URL.createObjectURL(opened.blob),
       status: 'queued' as const,
       customized: false,
       settings,
@@ -249,7 +248,11 @@ export const useBatchStore = create<BatchStore>((set, get) => ({
     const item = get().items.find((entry) => entry.id === id)
     if (!item || useEditorStore.getState().isReading) return
     set({ editingId: id })
-    const opened = await useEditorStore.getState().loadFile(item.file, item.settings)
+    const opened = await useEditorStore.getState().loadFile(item.file, item.settings, {
+      blob: item.bitmap,
+      width: item.width,
+      height: item.height,
+    })
     if (get().editingId !== id) return
     if (!opened) set((state) => ({ editingId: null, delay: 0, jobVersion: state.jobVersion + 1 }))
   },
@@ -283,7 +286,7 @@ export const useBatchStore = create<BatchStore>((set, get) => ({
         height: editor.height,
         quality: editor.quality,
       })
-    const file = editor.source.blob instanceof File ? editor.source.blob : item.file
+    const file = editor.source.file
     const fileChanged = file !== item.file
     const sourceWidth = editor.source.width
     const sourceHeight = editor.source.height
@@ -302,7 +305,8 @@ export const useBatchStore = create<BatchStore>((set, get) => ({
         settings: nextSettings,
       }
     }
-    const thumbUrl = fileChanged ? URL.createObjectURL(file) : item.thumbUrl
+    const bitmap = editor.source.blob
+    const thumbUrl = fileChanged ? URL.createObjectURL(bitmap) : item.thumbUrl
     if (fileChanged) URL.revokeObjectURL(item.thumbUrl)
     editor.leave()
 
@@ -315,6 +319,7 @@ export const useBatchStore = create<BatchStore>((set, get) => ({
           ? {
               ...entry,
               file,
+              bitmap: fileChanged ? bitmap : entry.bitmap,
               name: file.name,
               bytes: file.size,
               width: fileChanged ? sourceWidth : entry.width,

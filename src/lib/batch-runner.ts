@@ -75,7 +75,7 @@ async function encodeJob(worker: Worker, job: BatchItem, signal: AbortSignal) {
         encodeOnce(
           worker,
           {
-            source: job.file,
+            source: job.bitmap,
             format: settings.format,
             quality: attempt.quality,
             width: attempt.width,
@@ -106,7 +106,7 @@ async function encodeJob(worker: Worker, job: BatchItem, signal: AbortSignal) {
   const encoded = await encodeOnce(
     worker,
     {
-      source: job.file,
+      source: job.bitmap,
       format: settings.format,
       quality: settings.quality,
       width: sized.width,

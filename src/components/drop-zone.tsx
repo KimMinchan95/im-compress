@@ -4,13 +4,13 @@ import { openIncoming } from '../lib/open-incoming'
 import { errorMessage } from '../lib/error-message'
 import { useI18n } from '../lib/use-i18n'
 import { useEditorStore } from '../store/editor-store'
-import { InstagramIcon, MailIcon } from './icons'
+import { GitHubIcon, InstagramIcon, MailIcon } from './icons'
 
-const FORMATS = ['JPG', 'WebP', 'PNG']
+const FORMATS = ['JPG', 'WebP', 'PNG', 'AVIF', 'HEIC']
 
 interface ContactLink {
   href: string
-  label: 'email' | 'instagram'
+  label: 'email' | 'instagram' | 'github'
   icon: ComponentType<{ className?: string }>
   external?: boolean
 }
@@ -18,6 +18,7 @@ interface ContactLink {
 const LINKS: ContactLink[] = [
   { href: 'mailto:hialscks@gmail.com', label: 'email', icon: MailIcon },
   { href: 'https://www.instagram.com/chan_pest/', label: 'instagram', icon: InstagramIcon, external: true },
+  { href: 'https://github.com/KimMinchan95/im-compress', label: 'github', icon: GitHubIcon, external: true },
 ]
 
 export function DropZone() {

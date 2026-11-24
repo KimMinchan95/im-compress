@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { sizeFromHeight, sizeFromScale, sizeFromWidth } from '../lib/aspect'
 import { isSupportedFile } from '../lib/files'
+import { readImage, type OpenedImage } from '../lib/read-image'
 import type { CompareMode, CompressSettings, EditorErrorCode, EncodeResult, EncodeStatus, OutputFormat, SizeMode, SourceImage } from '../types'
 import { usePresets } from './preset-store'
 import { useStageStore } from './stage-store'
@@ -23,7 +24,7 @@ interface EditorStore {
   error: EditorErrorCode | null
   isReading: boolean
   retryToken: number
-  loadFile: (file: File, settings?: CompressSettings) => Promise<boolean>
+  loadFile: (file: File, settings?: CompressSettings, prepared?: OpenedImage) => Promise<boolean>
   setFormat: (format: OutputFormat) => void
   setQuality: (quality: number) => void
   setWidth: (width: number) => void
@@ -84,7 +85,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   isReading: false,
   retryToken: 0,
 
-  loadFile: async (file, settings) => {
+  loadFile: async (file, settings, prepared) => {
     if (!isSupportedFile(file)) {
       set({ error: 'unsupported' })
       return false
@@ -93,12 +94,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     set({ isReading: true, error: null })
 
     try {
-      const bitmap = await createImageBitmap(file)
-      const width = bitmap.width
-      const height = bitmap.height
-      bitmap.close()
-
-      if (width < 1 || height < 1) throw new Error('empty')
+      const opened = prepared ?? (await readImage(file))
+      const width = opened.width
+      const height = opened.height
 
       const fitted = sizeFromWidth(width, height, width)
       const current = get()
@@ -115,8 +113,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
           bytes: file.size,
           width,
           height,
-          url: URL.createObjectURL(file),
-          blob: file,
+          url: URL.createObjectURL(opened.blob),
+          blob: opened.blob,
+          file,
         },
         format: settings?.format ?? preset?.format ?? 'jpeg',
         quality: settings?.quality ?? preset?.quality ?? DEFAULT_QUALITY,

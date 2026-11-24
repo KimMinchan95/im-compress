@@ -23,6 +23,7 @@ export interface SourceImage {
   height: number
   url: string
   blob: Blob
+  file: File
 }
 
 export interface EncodeResult {

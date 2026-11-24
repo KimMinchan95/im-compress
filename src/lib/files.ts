@@ -16,15 +16,33 @@ export const QUALITY_PRESETS = [
   { id: 'best', value: 92 },
 ] as const
 
-const SUPPORTED_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
-const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.webp', '.png']
+const SUPPORTED_TYPES = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/avif',
+  'image/avif-sequence',
+  'image/heic',
+  'image/heif',
+  'image/heic-sequence',
+  'image/heif-sequence',
+])
+const SUPPORTED_EXTENSIONS = ['.jpg', '.jpeg', '.webp', '.png', '.avif', '.heic', '.heif']
+const HEIC_TYPES = new Set(['image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence'])
 
-export const FILE_ACCEPT = ['image/jpeg', 'image/webp', 'image/png', ...SUPPORTED_EXTENSIONS].join(',')
+export const FILE_ACCEPT = ['image/jpeg', 'image/webp', 'image/png', 'image/avif', 'image/heic', 'image/heif', ...SUPPORTED_EXTENSIONS].join(',')
 
 export function isSupportedFile(file: File) {
-  if (SUPPORTED_TYPES.has(file.type)) return true
+  if (SUPPORTED_TYPES.has(file.type.toLowerCase())) return true
   const name = file.name.toLowerCase()
   return SUPPORTED_EXTENSIONS.some((extension) => name.endsWith(extension))
+}
+
+export function isHeicFile(file: File) {
+  if (HEIC_TYPES.has(file.type.toLowerCase())) return true
+  const name = file.name.toLowerCase()
+  return name.endsWith('.heic') || name.endsWith('.heif')
 }
 
 function stripExtension(name: string) {
