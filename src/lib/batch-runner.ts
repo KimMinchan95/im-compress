@@ -1,18 +1,29 @@
 import { useEffect } from 'react'
-import type { EncodeRequest, EncodeResponse } from '../types'
+import type { EncodeRequest } from '../types'
 import { prepareQueue, useBatchStore, type BatchItem } from '../store/batch-store'
 import { sizeFromScale } from './aspect'
 import { FORMAT_META, ensureMime } from './files'
 import { matchBytes } from './match-bytes'
+import { createWorkerClient, type WorkerClient } from './worker-client'
 
-let requestId = 0
+type EncodeInput = Omit<EncodeRequest, 'id'>
+type Encoder = WorkerClient<EncodeInput>
+
+const POOL_SIZE = 2
 let controller = new AbortController()
-let workers: Worker[] = []
+let encoders: Encoder[] = []
 
+function createEncoder(): Encoder {
+  return createWorkerClient<EncodeInput>(
+    () => new Worker(new URL('../workers/encode.worker.ts', import.meta.url), { type: 'module' }),
+  )
+}
+
+/** Aborts the queue and cancels in-flight encodes; their pending promises reject with `cancelled`. */
 function stopBatch() {
   controller.abort()
-  for (const worker of workers) worker.terminate()
-  workers = []
+  for (const encoder of encoders) encoder.cancel()
+  encoders = []
   controller = new AbortController()
 }
 
@@ -30,59 +41,21 @@ function claim() {
   return found.job
 }
 
-function encodeOnce(
-  worker: Worker,
-  input: Omit<EncodeRequest, 'id'>,
-  signal: AbortSignal,
-) {
-  const id = ++requestId
-  return new Promise<Blob>((resolve, reject) => {
-    const finish = (error?: Error, blob?: Blob) => {
-      worker.removeEventListener('message', onMessage)
-      worker.removeEventListener('error', onError)
-      signal.removeEventListener('abort', onAbort)
-      if (blob) resolve(blob)
-      else reject(error ?? new Error('encode'))
-    }
-    const onAbort = () => finish(new Error('cancelled'))
-    const onError = () => finish(new Error(signal.aborted ? 'cancelled' : 'encode'))
-    const onMessage = (event: MessageEvent<EncodeResponse>) => {
-      if (event.data.id !== id) return
-      if (signal.aborted) {
-        finish(new Error('cancelled'))
-        return
-      }
-      if (event.data.blob) finish(undefined, event.data.blob)
-      else finish(new Error('encode'))
-    }
-    if (signal.aborted) {
-      finish(new Error('cancelled'))
-      return
-    }
-    signal.addEventListener('abort', onAbort, { once: true })
-    worker.addEventListener('message', onMessage)
-    worker.addEventListener('error', onError)
-    worker.postMessage({ id, ...input } satisfies EncodeRequest)
-  })
-}
-
-async function encodeJob(worker: Worker, job: BatchItem, signal: AbortSignal) {
+async function encodeJob(encoder: Encoder, job: BatchItem) {
   const settings = job.settings
   const mime = FORMAT_META[settings.format].mime
   if (settings.sizeMode === 'bytes' && settings.targetBytes != null) {
+    // The size search skips the PNG optimiser; only the chosen result is optimised below.
     const matched = await matchBytes(
       (attempt) =>
-        encodeOnce(
-          worker,
-          {
-            source: job.bitmap,
-            format: settings.format,
-            quality: attempt.quality,
-            width: attempt.width,
-            height: attempt.height,
-          },
-          signal,
-        ),
+        encoder.run({
+          source: job.bitmap,
+          format: settings.format,
+          quality: attempt.quality,
+          width: attempt.width,
+          height: attempt.height,
+          optimize: false,
+        }),
       {
         sourceWidth: job.width,
         sourceHeight: job.height,
@@ -90,7 +63,18 @@ async function encodeJob(worker: Worker, job: BatchItem, signal: AbortSignal) {
         targetBytes: settings.targetBytes,
       },
     )
-    const blob = await ensureMime(matched.blob, mime)
+    const finalBlob =
+      settings.format === 'png'
+        ? await encoder.run({
+            source: job.bitmap,
+            format: settings.format,
+            quality: matched.quality,
+            width: matched.width,
+            height: matched.height,
+            optimize: true,
+          })
+        : matched.blob
+    const blob = await ensureMime(finalBlob, mime)
     return {
       blob,
       bytes: blob.size,
@@ -103,17 +87,13 @@ async function encodeJob(worker: Worker, job: BatchItem, signal: AbortSignal) {
   }
 
   const sized = sizeFromScale(job.width, job.height, settings.sizeMode === 'dimensions' ? settings.scale : 100)
-  const encoded = await encodeOnce(
-    worker,
-    {
-      source: job.bitmap,
-      format: settings.format,
-      quality: settings.quality,
-      width: sized.width,
-      height: sized.height,
-    },
-    signal,
-  )
+  const encoded = await encoder.run({
+    source: job.bitmap,
+    format: settings.format,
+    quality: settings.quality,
+    width: sized.width,
+    height: sized.height,
+  })
   const blob = await ensureMime(encoded, mime)
   return {
     blob,
@@ -126,13 +106,13 @@ async function encodeJob(worker: Worker, job: BatchItem, signal: AbortSignal) {
   }
 }
 
-async function pump(worker: Worker, signal: AbortSignal, isCurrent: () => boolean) {
+async function pump(encoder: Encoder, signal: AbortSignal, isCurrent: () => boolean) {
   try {
     while (isCurrent() && !signal.aborted) {
       const job = claim()
       if (!job) return
       try {
-        const encoded = await encodeJob(worker, job, signal)
+        const encoded = await encodeJob(encoder, job)
         if (!isCurrent() || signal.aborted) return
         useBatchStore.getState().finishItem(job.id, encoded)
       } catch (error) {
@@ -141,17 +121,14 @@ async function pump(worker: Worker, signal: AbortSignal, isCurrent: () => boolea
       }
     }
   } finally {
-    worker.terminate()
+    encoder.cancel()
   }
 }
 
 function runPool(isCurrent: () => boolean) {
   const signal = controller.signal
-  const pool = [0, 1].map(
-    () => new Worker(new URL('../workers/encode.worker.ts', import.meta.url), { type: 'module' }),
-  )
-  workers = pool
-  return Promise.all(pool.map((worker) => pump(worker, signal, isCurrent)))
+  encoders = Array.from({ length: POOL_SIZE }, () => createEncoder())
+  return Promise.all(encoders.map((encoder) => pump(encoder, signal, isCurrent)))
 }
 
 export function useBatchRunner() {

@@ -44,6 +44,8 @@ function useSavingsCaption() {
   const format = useEditorStore((state) => state.format)
   const quality = useEditorStore((state) => state.quality)
   if (!source) return ''
+  // A failed encode must not keep showing "계산 중"; the controls panel explains the failure.
+  if (status === 'error') return t('encodeFailed')
 
   const isCurrent = result ? isResultCurrent(result, { format, width, height, quality }) : false
   if (!result || !isCurrent || status === 'encoding') {

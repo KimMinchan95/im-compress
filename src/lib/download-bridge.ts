@@ -1,4 +1,5 @@
-const WORKER_VERSION = '7'
+// Bumped because the worker now expects a Blob instead of an ArrayBuffer; old workers are replaced.
+const WORKER_VERSION = '8'
 
 const readyIds = new Set<string>()
 let lastFile: { id: string; blob: Blob; mime: string } | null = null
@@ -87,7 +88,7 @@ function rememberReady(id: string) {
   readyIds.add(id)
 }
 
-function postFile(worker: ServiceWorker, id: string, mime: string, buffer: ArrayBuffer) {
+function postFile(worker: ServiceWorker, id: string, mime: string, blob: Blob) {
   return new Promise<boolean>((resolve) => {
     let settled = false
     const finish = (accepted: boolean) => {
@@ -103,7 +104,8 @@ function postFile(worker: ServiceWorker, id: string, mime: string, buffer: Array
       finish(Boolean(event.data?.ok && event.data.id === id))
     }
     try {
-      worker.postMessage({ type: 'file', id, mime, buffer }, [buffer, channel.port2])
+      // A Blob is cloned by reference, so the bytes are never copied on the main thread.
+      worker.postMessage({ type: 'file', id, mime, blob }, [channel.port2])
     } catch {
       finish(false)
     }
@@ -125,8 +127,7 @@ export async function publishDownload(id: string, blob: Blob, mime: string) {
     let worker = navigator.serviceWorker.controller
     if (!worker || !isCurrentWorker(worker.scriptURL)) worker = await whenCurrentController()
     if (!worker || !isCurrentWorker(worker.scriptURL)) return false
-    const buffer = await blob.arrayBuffer()
-    return postFile(worker, id, mime, buffer)
+    return postFile(worker, id, mime, blob)
   })().catch(() => false)
 
   return Promise.race([

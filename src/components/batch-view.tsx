@@ -4,7 +4,7 @@ import { byteFieldValue } from '../lib/byte-field'
 import { formatBytes, savingsOf } from '../lib/format-bytes'
 import { FORMAT_META, FORMATS, QUALITY_PRESETS, downloadName, fileStem, isKakaoTalk, saveDownload } from '../lib/files'
 import { useI18n } from '../lib/use-i18n'
-import { zipStored } from '../lib/zip'
+import { zipInWorker } from '../lib/zip-client'
 import { sameSettings, useBatchStore, type BatchItem } from '../store/batch-store'
 import { isSamePreset, presetName, useBatchPresets } from '../store/preset-store'
 import { ChevronIcon, CloseIcon } from './icons'
@@ -70,7 +70,7 @@ export function BatchView() {
     setZipHint(null)
     try {
       const names = uniqueNames(ready.map((item) => downloadName(item.name, item.result!.format)))
-      const blob = await zipStored(ready.map((item, index) => ({ name: names[index], blob: item.result!.blob })))
+      const blob = await zipInWorker(ready.map((item, index) => ({ name: names[index], blob: item.result!.blob })))
       const outcome = await saveDownload(blob, t('batchZipName'))
       if (outcome === 'failed') setZipHint(isKakaoTalk() ? t('kakaoDownload') : t('downloadRetry'))
     } catch {

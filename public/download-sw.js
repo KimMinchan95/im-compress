@@ -56,11 +56,11 @@ async function trimCache(cache, keepId) {
 
 async function storeFile(data) {
   if (!isDownloadId(data.id) || !ALLOWED_MIME.has(data.mime)) return false
-  if (!(data.buffer instanceof ArrayBuffer) || data.buffer.byteLength < 1) return false
+  if (!(data.blob instanceof Blob) || data.blob.size < 1) return false
   const cache = await caches.open(CACHE_NAME)
   await cache.put(
     fileRequest(data.id),
-    new Response(data.buffer, {
+    new Response(data.blob, {
       headers: {
         'Content-Type': data.mime,
         'X-Stored-At': String(Date.now()),

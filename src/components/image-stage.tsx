@@ -401,6 +401,7 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
                   <img
                     src={resultUrl}
                     alt={mode === 'result' ? t('altCompressed') : ''}
+                    decoding="async"
                     draggable={false}
                     className={`pointer-events-none absolute inset-0 h-full w-full object-contain transition-opacity duration-300 ${
                       mode === 'original' ? 'opacity-0' : 'opacity-100'
@@ -411,6 +412,7 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
                   ref={originalRef}
                   src={originalUrl}
                   alt={mode === 'result' ? '' : t('altOriginal')}
+                  decoding="async"
                   draggable={false}
                   className={`pointer-events-none absolute inset-0 h-full w-full object-contain transition-opacity duration-300 ${
                     mode === 'result' ? 'opacity-0' : 'opacity-100'

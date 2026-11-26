@@ -112,9 +112,13 @@ function shareImage(blob: Blob, filename: string, mime: string) {
   )
 }
 
+/**
+ * Re-labels a blob with the given MIME type. Passing the Blob itself as the part keeps the bytes
+ * in browser storage, so nothing is copied into JS memory on the main thread.
+ */
 export async function ensureMime(blob: Blob, mime: string) {
   if (blob.type === mime) return blob
-  return new Blob([await blob.arrayBuffer()], { type: mime })
+  return new Blob([blob], { type: mime })
 }
 
 function anchorDownload(url: string, filename: string, removeAfter = 0) {

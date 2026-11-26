@@ -44,9 +44,20 @@ export interface EncodeRequest {
   quality: number
   width: number
   height: number
+  /** Lossless PNG optimisation (oxipng). Defaults to true; search passes skip it for speed. */
+  optimize?: boolean
 }
 
+/** Decodes a HEIC/HEIF file to PNG inside a dedicated worker so the main thread stays responsive. */
+export interface HeicDecodeRequest {
+  id: number
+  source: Blob
+}
+
+/** Shared reply shape for every worker: a blob on success, otherwise a short error reason. */
 export interface EncodeResponse {
   id: number
   blob?: Blob
+  /** Short machine-readable reason when no blob is produced. */
+  error?: string
 }

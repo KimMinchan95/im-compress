@@ -2,48 +2,19 @@ import { useEffect } from 'react'
 import { createDownloadId, publishDownload } from './download-bridge'
 import { FORMAT_META, ensureMime } from './files'
 import { matchBytes } from './match-bytes'
+import { createWorkerClient } from './worker-client'
 import { useEditorStore } from '../store/editor-store'
-import type { EncodeRequest, EncodeResponse, OutputFormat } from '../types'
+import type { EncodeRequest } from '../types'
 
-interface EncodeInput {
-  source: Blob
-  format: OutputFormat
-  quality: number
-  width: number
-  height: number
-}
+type EncodeInput = Omit<EncodeRequest, 'id'>
 
-let worker: Worker | null = null
-let activeId = 0
+/** One long-lived encode worker for the editor; see `worker-client.ts`. */
+const encoder = createWorkerClient<EncodeInput>(
+  () => new Worker(new URL('../workers/encode.worker.ts', import.meta.url), { type: 'module' }),
+)
 
-function encodeOnce(input: EncodeInput, isCancelled: () => boolean) {
-  const id = ++activeId
-  worker?.terminate()
-
-  const nextWorker = new Worker(new URL('../workers/encode.worker.ts', import.meta.url), {
-    type: 'module',
-  })
-  worker = nextWorker
-
-  return new Promise<Blob>((resolve, reject) => {
-    nextWorker.onmessage = (event: MessageEvent<EncodeResponse>) => {
-      if (event.data.id !== id) return
-      if (isCancelled()) {
-        reject(new Error('cancelled'))
-        return
-      }
-      if (event.data.blob) resolve(event.data.blob)
-      else reject(new Error('encode'))
-    }
-
-    nextWorker.onerror = () => {
-      if (id !== activeId) return
-      reject(new Error(isCancelled() ? 'cancelled' : 'encode'))
-    }
-
-    const request: EncodeRequest = { id, ...input }
-    nextWorker.postMessage(request)
-  })
+function encodeOnce(input: EncodeInput) {
+  return encoder.run(input)
 }
 
 export function useEncoder() {
@@ -65,7 +36,6 @@ export function useEncoder() {
     if (current.targetBytes != null && current.matchedTarget === current.targetBytes) return
 
     let cancelled = false
-    const isCancelled = () => cancelled
     beginEncode()
 
     const timer = window.setTimeout(() => {
@@ -74,19 +44,19 @@ export function useEncoder() {
           const latest = useEditorStore.getState()
           const image = latest.source
           if (!image) return
+
           if (latest.targetBytes != null) {
+            // Size search skips the expensive PNG optimiser; only the final result gets it.
             const matched = await matchBytes(
               (attempt) =>
-                encodeOnce(
-                  {
-                    source: image.blob,
-                    format: latest.format,
-                    quality: attempt.quality,
-                    width: attempt.width,
-                    height: attempt.height,
-                  },
-                  isCancelled,
-                ),
+                encodeOnce({
+                  source: image.blob,
+                  format: latest.format,
+                  quality: attempt.quality,
+                  width: attempt.width,
+                  height: attempt.height,
+                  optimize: false,
+                }),
               {
                 sourceWidth: image.width,
                 sourceHeight: image.height,
@@ -95,11 +65,27 @@ export function useEncoder() {
               },
             )
             if (cancelled) return
-            const matchedBlob = await ensureMime(matched.blob, FORMAT_META[latest.format].mime)
+
+            const finalBlob =
+              latest.format === 'png'
+                ? await encodeOnce({
+                    source: image.blob,
+                    format: latest.format,
+                    quality: matched.quality,
+                    width: matched.width,
+                    height: matched.height,
+                    optimize: true,
+                  })
+                : matched.blob
             if (cancelled) return
+
+            const matchedBlob = await ensureMime(finalBlob, FORMAT_META[latest.format].mime)
+            if (cancelled) return
+
             const matchedDownloadId = createDownloadId()
             await publishDownload(matchedDownloadId, matchedBlob, FORMAT_META[latest.format].mime)
             if (cancelled) return
+
             applyMatched({
               result: {
                 url: URL.createObjectURL(matchedBlob),
@@ -119,16 +105,13 @@ export function useEncoder() {
             return
           }
 
-          const blob = await encodeOnce(
-            {
-              source: image.blob,
-              format: latest.format,
-              quality: latest.quality,
-              width: latest.width,
-              height: latest.height,
-            },
-            isCancelled,
-          )
+          const blob = await encodeOnce({
+            source: image.blob,
+            format: latest.format,
+            quality: latest.quality,
+            width: latest.width,
+            height: latest.height,
+          })
           if (cancelled) return
           const typed = await ensureMime(blob, FORMAT_META[latest.format].mime)
           if (cancelled) return
@@ -147,6 +130,7 @@ export function useEncoder() {
           })
         } catch (error) {
           if (cancelled || (error instanceof Error && error.message === 'cancelled')) return
+          console.warn('[encode] failed:', error)
           applyError('encode-failed')
         }
       })()
@@ -155,8 +139,7 @@ export function useEncoder() {
     return () => {
       cancelled = true
       window.clearTimeout(timer)
-      worker?.terminate()
-      if (worker) worker = null
+      encoder.cancel()
     }
   }, [
     source,

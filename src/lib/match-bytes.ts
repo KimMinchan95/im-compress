@@ -24,7 +24,12 @@ interface Candidate extends EncodeAttempt {
  * Below this, artefacts become clearly visible, while a modest resize is usually less noticeable.
  */
 const QUALITY_FLOOR = 40
-const SCALE_STEPS = 8
+const SCALE_STEPS = 6
+/**
+ * A fitting candidate this close to the target (2%) is good enough: the remaining search steps
+ * would only buy a few hundred bytes at the cost of another full encode each.
+ */
+const TOLERANCE_RATIO = 0.02
 
 /**
  * Finds the best encode that fits within `targetBytes`.
@@ -74,6 +79,7 @@ async function searchQuality(
     const candidate = await attempt(encode, { quality, ...size })
     if (candidate.bytes <= target) {
       best = candidate
+      if (isWithinTolerance(candidate.bytes, target)) break
       lo = quality + 1
     } else {
       hi = quality - 1
@@ -106,6 +112,7 @@ async function searchScale(
 
     if (candidate.bytes <= target) {
       best = candidate
+      if (isWithinTolerance(candidate.bytes, target)) break
       lo = scale + 1
     } else {
       hi = scale - 1
@@ -123,6 +130,10 @@ async function attempt(
 ): Promise<Candidate> {
   const blob = await encode(input)
   return { ...input, blob, bytes: blob.size }
+}
+
+function isWithinTolerance(bytes: number, target: number) {
+  return target - bytes <= target * TOLERANCE_RATIO
 }
 
 function clampQuality(quality: number) {

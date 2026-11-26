@@ -1,6 +1,7 @@
 import { keepDisplayP3, readDisplayP3Profile } from '../lib/color-profile'
 import { FORMAT_META } from '../lib/files'
 import type { EncodeRequest, EncodeResponse, OutputFormat } from '../types'
+import quantizerWasmUrl from 'libimagequant-wasm/wasm/libimagequant_wasm_bg.wasm?url'
 import {
   loadJpegEncoder,
   loadOxipng,
@@ -25,7 +26,11 @@ interface Surface {
 }
 
 self.onmessage = async (event: MessageEvent<EncodeRequest>) => {
-  const { id, source, format, quality, width, height } = event.data
+  await encode(event.data)
+}
+
+async function encode(request: EncodeRequest) {
+  const { id, source, format, quality, width, height, optimize = true } = request
 
   try {
     if (width < 1 || height < 1) throw new Error('size')
@@ -35,18 +40,24 @@ self.onmessage = async (event: MessageEvent<EncodeRequest>) => {
     try {
       const encoded =
         format === 'png'
-          ? await encodePng(source, bitmap, width, height, quality)
+          ? await encodePng(source, bitmap, width, height, quality, optimize)
           : await encodeLossy(bitmap, format, quality, width, height, profile)
       const blob = keepSourceIfSmaller(source, encoded, format, bitmap, width, height)
-      const response: EncodeResponse = { id, blob }
-      self.postMessage(response)
+      post({ id, blob })
     } finally {
       bitmap.close()
     }
-  } catch {
-    const response: EncodeResponse = { id }
-    self.postMessage(response)
+  } catch (error) {
+    post({ id, error: describeError(error) })
   }
+}
+
+function post(response: EncodeResponse) {
+  self.postMessage(response)
+}
+
+function describeError(error: unknown) {
+  return error instanceof Error ? `${error.name}: ${error.message}` : String(error)
 }
 
 /**
@@ -134,21 +145,49 @@ function webpOptions(quality: number): WebpEncodeOptions {
  * PNG output is either a palette quantisation (lossy, controlled by the quality slider) or, at
  * 100%, a lossless re-encode that never changes pixels.
  */
-async function encodePng(source: Blob, bitmap: ImageBitmap, width: number, height: number, quality: number) {
+async function encodePng(
+  source: Blob,
+  bitmap: ImageBitmap,
+  width: number,
+  height: number,
+  quality: number,
+  optimize: boolean,
+) {
+  const strategies: Array<() => Promise<Blob>> = []
   if (quality < 100 && width * height <= PNG_PIXEL_LIMIT) {
-    try {
-      return await quantizedPng(source, bitmap, width, height, quality)
-    } catch {
-      // Quantization is optional; the lossless path below still produces a valid file.
-    }
+    strategies.push(() => quantizedPng(source, bitmap, width, height, quality, optimize))
   }
-  return losslessPng(source, bitmap, width, height)
+  strategies.push(() => losslessPng(source, bitmap, width, height, optimize))
+  return firstSuccess(strategies)
 }
 
-async function losslessPng(source: Blob, bitmap: ImageBitmap, width: number, height: number) {
+/**
+ * Runs strategies in order and returns the first that succeeds. Each failure is logged so a
+ * real problem is visible in the console instead of disappearing into a generic error.
+ */
+async function firstSuccess(strategies: Array<() => Promise<Blob>>): Promise<Blob> {
+  let lastError: unknown = new Error('no png strategy')
+  for (const strategy of strategies) {
+    try {
+      return await strategy()
+    } catch (error) {
+      console.warn('[encode] png strategy failed:', error)
+      lastError = error
+    }
+  }
+  throw lastError
+}
+
+/**
+ * Lossless PNG: the source bytes are reused when they are already a same-size PNG (no decode
+ * needed); otherwise the pixels are rasterised and written out by the canvas encoder.
+ */
+async function losslessPng(source: Blob, bitmap: ImageBitmap, width: number, height: number, optimize: boolean) {
   const canUseSource = isSameSize(bitmap, width, height) && (await isPng(source))
-  const bytes = canUseSource ? new Uint8Array(await source.arrayBuffer()) : await canvasPngBytes(bitmap, width, height)
-  return optimisedPng(bytes)
+  const bytes = canUseSource
+    ? new Uint8Array(await source.arrayBuffer())
+    : await canvasPngBytes(bitmap, width, height)
+  return optimisedPng(bytes, optimize)
 }
 
 async function canvasPngBytes(bitmap: ImageBitmap, width: number, height: number) {
@@ -157,7 +196,14 @@ async function canvasPngBytes(bitmap: ImageBitmap, width: number, height: number
   return new Uint8Array(await blob.arrayBuffer())
 }
 
-async function quantizedPng(source: Blob, bitmap: ImageBitmap, width: number, height: number, quality: number) {
+async function quantizedPng(
+  source: Blob,
+  bitmap: ImageBitmap,
+  width: number,
+  height: number,
+  quality: number,
+  optimize: boolean,
+) {
   const wasm = await loadQuantizer()
   const quantizer = new wasm.ImageQuantizer()
   const palette = paletteSettings(quality)
@@ -167,7 +213,7 @@ async function quantizedPng(source: Blob, bitmap: ImageBitmap, width: number, he
     quantizer.setQuality(0, palette.target)
     if (isSameSize(bitmap, width, height) && (await isPng(source))) {
       const result = quantizer.quantizePng(new Uint8Array(await source.arrayBuffer()), palette.dither, 'none')
-      return await optimisedPng(result.pngBytes)
+      return await optimisedPng(result.pngBytes, optimize)
     }
 
     const { context } = rasterize(bitmap, width, height, { wide: false, background: null })
@@ -176,7 +222,7 @@ async function quantizedPng(source: Blob, bitmap: ImageBitmap, width: number, he
     try {
       raw.setDithering(palette.dither)
       const indices = raw.getPaletteIndices(image.data, width, height)
-      return await optimisedPng(wasm.encode_palette_to_png(indices, raw.getPalette(), width, height))
+      return await optimisedPng(wasm.encode_palette_to_png(indices, raw.getPalette(), width, height), optimize)
     } finally {
       raw.free()
     }
@@ -186,11 +232,13 @@ async function quantizedPng(source: Blob, bitmap: ImageBitmap, width: number, he
 }
 
 /**
- * Losslessly squeezes PNG bytes with oxipng. If the optimiser is unavailable, the input bytes are
- * still returned as a valid PNG.
+ * Losslessly squeezes PNG bytes with oxipng. If the optimiser is unavailable, or `optimize` is
+ * false, the input bytes are returned as a valid PNG.
  */
-async function optimisedPng(bytes: Uint8Array) {
+async function optimisedPng(bytes: Uint8Array, optimize: boolean) {
   const input = bytes.slice().buffer
+  if (!optimize) return new Blob([input], { type: FORMAT_META.png.mime })
+
   const output = await loadOxipng()
     .then((codec) => codec.default(input, { level: OXIPNG_LEVEL }))
     .catch(() => input)
@@ -208,9 +256,13 @@ function paletteSettings(quality: number) {
   return { maxColors: 256, dither, target: Math.max(level, 1) }
 }
 
+/**
+ * The wasm-bindgen glue cannot locate its `.wasm` after bundling, so the Vite-emitted URL is
+ * passed explicitly. Without it, quantisation fails and PNG output silently loses its best path.
+ */
 function loadQuantizer() {
   quantizerWasm ??= import('libimagequant-wasm/wasm/libimagequant_wasm.js').then(async (wasm) => {
-    await wasm.default()
+    await wasm.default({ module_or_path: quantizerWasmUrl })
     return wasm
   })
   return quantizerWasm
