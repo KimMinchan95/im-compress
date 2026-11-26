@@ -1,11 +1,28 @@
 import { keepDisplayP3, readDisplayP3Profile } from '../lib/color-profile'
 import { FORMAT_META } from '../lib/files'
-import type { EncodeRequest, EncodeResponse } from '../types'
+import type { EncodeRequest, EncodeResponse, OutputFormat } from '../types'
+import {
+  loadJpegEncoder,
+  loadOxipng,
+  loadWebpEncoder,
+  type JpegEncodeOptions,
+  type WebpEncodeOptions,
+} from './codecs'
 
 const PNG_PIXEL_LIMIT = 16_777_216
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10]
+// Level 3 took ~4x longer than level 2 on a 12MP image for a ~0.06% size gain, which made
+// large PNG conversions look stuck (and multiplied the cost in byte-target search).
+const OXIPNG_LEVEL = 2
+const WHITE = '#ffffff'
 
 let quantizerWasm: Promise<typeof import('libimagequant-wasm/wasm/libimagequant_wasm.js')> | null = null
+
+interface Surface {
+  canvas: OffscreenCanvas
+  context: OffscreenCanvasRenderingContext2D
+  keepProfile: boolean
+}
 
 self.onmessage = async (event: MessageEvent<EncodeRequest>) => {
   const { id, source, format, quality, width, height } = event.data
@@ -15,49 +32,132 @@ self.onmessage = async (event: MessageEvent<EncodeRequest>) => {
 
     const profile = format === 'png' ? null : await readDisplayP3Profile(source).catch(() => null)
     const bitmap = await createImageBitmap(source)
-    if (format === 'png') {
-      try {
-        const blob = await quantizedPng(source, bitmap, width, height, quality)
-        bitmap.close()
-        const response: EncodeResponse = { id, blob }
-        self.postMessage(response)
-        return
-      } catch {
-        // The browser PNG encoder still produces a file if quantization cannot.
-      }
+    try {
+      const encoded =
+        format === 'png'
+          ? await encodePng(source, bitmap, width, height, quality)
+          : await encodeLossy(bitmap, format, quality, width, height, profile)
+      const blob = keepSourceIfSmaller(source, encoded, format, bitmap, width, height)
+      const response: EncodeResponse = { id, blob }
+      self.postMessage(response)
+    } finally {
+      bitmap.close()
     }
-
-    const canvas = new OffscreenCanvas(width, height)
-    const surface = drawingSurface(canvas, profile !== null)
-    if (!surface) throw new Error('context')
-
-    surface.context.imageSmoothingEnabled = true
-    surface.context.imageSmoothingQuality = 'high'
-
-    if (format === 'jpeg') {
-      surface.context.fillStyle = '#ffffff'
-      surface.context.fillRect(0, 0, width, height)
-    }
-
-    surface.context.drawImage(bitmap, 0, 0, width, height)
-    bitmap.close()
-
-    const encoded = await canvas.convertToBlob({
-      type: FORMAT_META[format].mime,
-      quality: format === 'png' ? undefined : quality / 100,
-    })
-    const blob = profile && surface.keepProfile ? await keepDisplayP3(encoded, profile, width, height).catch(() => encoded) : encoded
-
-    const response: EncodeResponse = { id, blob }
-    self.postMessage(response)
   } catch {
     const response: EncodeResponse = { id }
     self.postMessage(response)
   }
 }
 
+/**
+ * Re-encoding an already compressed file at the same size can make it larger. In that case the
+ * untouched source is returned instead: identical pixels and a file that is never bigger.
+ */
+function keepSourceIfSmaller(
+  source: Blob,
+  encoded: Blob,
+  format: OutputFormat,
+  bitmap: ImageBitmap,
+  width: number,
+  height: number,
+) {
+  const isSameFormat = source.type === FORMAT_META[format].mime
+  const isSameSize = bitmap.width === width && bitmap.height === height
+  return isSameFormat && isSameSize && encoded.size >= source.size ? source : encoded
+}
+
+/**
+ * JPEG and WebP go through dedicated encoders (MozJPEG / libwebp) instead of the browser's
+ * built-in canvas encoder, which exposes no tuning and produces larger files at the same quality.
+ * If a codec fails to load or run, the canvas encoder is used so the app keeps working.
+ */
+async function encodeLossy(
+  bitmap: ImageBitmap,
+  format: Exclude<OutputFormat, 'png'>,
+  quality: number,
+  width: number,
+  height: number,
+  profile: Uint8Array | null,
+): Promise<Blob> {
+  const surface = rasterize(bitmap, width, height, {
+    wide: profile !== null,
+    background: format === 'jpeg' ? WHITE : null,
+  })
+  const encoded = await encodeWithCodec(format, surface, quality).catch(() =>
+    surface.canvas.convertToBlob({ type: FORMAT_META[format].mime, quality: quality / 100 }),
+  )
+  return profile && surface.keepProfile ? keepDisplayP3(encoded, profile, width, height).catch(() => encoded) : encoded
+}
+
+async function encodeWithCodec(format: Exclude<OutputFormat, 'png'>, surface: Surface, quality: number) {
+  const pixels = surface.context.getImageData(0, 0, surface.canvas.width, surface.canvas.height)
+
+  if (format === 'jpeg') {
+    const codec = await loadJpegEncoder()
+    const bytes = await codec.default(pixels, jpegOptions(quality))
+    return new Blob([bytes], { type: FORMAT_META.jpeg.mime })
+  }
+
+  const codec = await loadWebpEncoder()
+  const bytes = await codec.default(pixels, webpOptions(quality))
+  return new Blob([bytes], { type: FORMAT_META.webp.mime })
+}
+
+/**
+ * MozJPEG: progressive scans and optimised Huffman tables are lossless size savings, and trellis
+ * quantisation picks cheaper coefficients with little visible change at the same quality value.
+ *
+ * Chroma is pinned to 4:2:0. MozJPEG's automatic mode switches to 4:2:2 / 4:4:4 at higher
+ * qualities, which adds roughly 2x the bytes for only a small colour-fidelity gain.
+ */
+function jpegOptions(quality: number): JpegEncodeOptions {
+  return {
+    quality,
+    progressive: true,
+    optimize_coding: true,
+    trellis_opt_zero: true,
+    trellis_opt_table: true,
+    auto_subsample: false,
+    chroma_subsample: 2,
+  }
+}
+
+/**
+ * libwebp: method 6 searches harder for the smallest encoding at the same quality.
+ * Sharp YUV is intentionally left off: in testing it increased size noticeably with no PSNR gain.
+ */
+function webpOptions(quality: number): WebpEncodeOptions {
+  return { quality, method: 6 }
+}
+
+/**
+ * PNG output is either a palette quantisation (lossy, controlled by the quality slider) or, at
+ * 100%, a lossless re-encode that never changes pixels.
+ */
+async function encodePng(source: Blob, bitmap: ImageBitmap, width: number, height: number, quality: number) {
+  if (quality < 100 && width * height <= PNG_PIXEL_LIMIT) {
+    try {
+      return await quantizedPng(source, bitmap, width, height, quality)
+    } catch {
+      // Quantization is optional; the lossless path below still produces a valid file.
+    }
+  }
+  return losslessPng(source, bitmap, width, height)
+}
+
+async function losslessPng(source: Blob, bitmap: ImageBitmap, width: number, height: number) {
+  const canUseSource = isSameSize(bitmap, width, height) && (await isPng(source))
+  const bytes = canUseSource ? new Uint8Array(await source.arrayBuffer()) : await canvasPngBytes(bitmap, width, height)
+  return optimisedPng(bytes)
+}
+
+async function canvasPngBytes(bitmap: ImageBitmap, width: number, height: number) {
+  const { canvas } = rasterize(bitmap, width, height, { wide: false, background: null })
+  const blob = await canvas.convertToBlob({ type: 'image/png' })
+  return new Uint8Array(await blob.arrayBuffer())
+}
+
 async function quantizedPng(source: Blob, bitmap: ImageBitmap, width: number, height: number, quality: number) {
-  if (width * height > PNG_PIXEL_LIMIT) throw new Error('large')
   const wasm = await loadQuantizer()
   const quantizer = new wasm.ImageQuantizer()
   const palette = paletteSettings(quality)
@@ -65,23 +165,18 @@ async function quantizedPng(source: Blob, bitmap: ImageBitmap, width: number, he
     quantizer.setMaxColors(palette.maxColors)
     quantizer.setSpeed(4)
     quantizer.setQuality(0, palette.target)
-    if (bitmap.width === width && bitmap.height === height && (await isPng(source))) {
+    if (isSameSize(bitmap, width, height) && (await isPng(source))) {
       const result = quantizer.quantizePng(new Uint8Array(await source.arrayBuffer()), palette.dither, 'none')
-      return pngBlob(result.pngBytes)
+      return await optimisedPng(result.pngBytes)
     }
 
-    const canvas = new OffscreenCanvas(width, height)
-    const context = canvas.getContext('2d')
-    if (!context) throw new Error('context')
-    context.imageSmoothingEnabled = true
-    context.imageSmoothingQuality = 'high'
-    context.drawImage(bitmap, 0, 0, width, height)
+    const { context } = rasterize(bitmap, width, height, { wide: false, background: null })
     const image = context.getImageData(0, 0, width, height)
     const raw = quantizer.quantizeImage(image.data, width, height)
     try {
       raw.setDithering(palette.dither)
       const indices = raw.getPaletteIndices(image.data, width, height)
-      return pngBlob(wasm.encode_palette_to_png(indices, raw.getPalette(), width, height))
+      return await optimisedPng(wasm.encode_palette_to_png(indices, raw.getPalette(), width, height))
     } finally {
       raw.free()
     }
@@ -90,14 +185,30 @@ async function quantizedPng(source: Blob, bitmap: ImageBitmap, width: number, he
   }
 }
 
-function paletteSettings(quality: number) {
-  const level = Math.min(100, Math.max(0, Math.round(quality)))
-  const maxColors = Math.max(2, Math.round(2 + (254 * level) / 100))
-  const dither = level >= 85 ? 0.35 : level >= 60 ? 0.2 : level >= 40 ? 0.08 : 0
-  return { maxColors, dither, target: Math.max(level, 1) }
+/**
+ * Losslessly squeezes PNG bytes with oxipng. If the optimiser is unavailable, the input bytes are
+ * still returned as a valid PNG.
+ */
+async function optimisedPng(bytes: Uint8Array) {
+  const input = bytes.slice().buffer
+  const output = await loadOxipng()
+    .then((codec) => codec.default(input, { level: OXIPNG_LEVEL }))
+    .catch(() => input)
+  return new Blob([output], { type: FORMAT_META.png.mime })
 }
 
-async function loadQuantizer() {
+/**
+ * The quality slider sets the libimagequant quality target, which decides how many colours are
+ * actually needed. The palette cap is the full 256: a lower cap forced visible banding even when
+ * the quality target could have been met with more colours.
+ */
+function paletteSettings(quality: number) {
+  const level = Math.min(100, Math.max(0, Math.round(quality)))
+  const dither = level >= 85 ? 0.35 : level >= 60 ? 0.2 : level >= 40 ? 0.08 : 0
+  return { maxColors: 256, dither, target: Math.max(level, 1) }
+}
+
+function loadQuantizer() {
   quantizerWasm ??= import('libimagequant-wasm/wasm/libimagequant_wasm.js').then(async (wasm) => {
     await wasm.default()
     return wasm
@@ -105,30 +216,48 @@ async function loadQuantizer() {
   return quantizerWasm
 }
 
+function rasterize(
+  bitmap: ImageBitmap,
+  width: number,
+  height: number,
+  options: { wide: boolean; background: string | null },
+): Surface {
+  const canvas = new OffscreenCanvas(width, height)
+  const surface = drawingSurface(canvas, options.wide)
+  if (!surface) throw new Error('context')
+
+  const { context } = surface
+  context.imageSmoothingEnabled = true
+  context.imageSmoothingQuality = 'high'
+  if (options.background) {
+    context.fillStyle = options.background
+    context.fillRect(0, 0, width, height)
+  }
+  context.drawImage(bitmap, 0, 0, width, height)
+  return surface
+}
+
+function isSameSize(bitmap: ImageBitmap, width: number, height: number) {
+  return bitmap.width === width && bitmap.height === height
+}
+
 async function isPng(blob: Blob) {
   const bytes = new Uint8Array(await blob.slice(0, PNG_SIGNATURE.length).arrayBuffer())
   return PNG_SIGNATURE.every((byte, index) => bytes[index] === byte)
 }
 
-function pngBlob(bytes: Uint8Array) {
-  const copy = new Uint8Array(bytes.byteLength)
-  copy.set(bytes)
-  return new Blob([copy], { type: 'image/png' })
-}
-
-function drawingSurface(canvas: OffscreenCanvas, wide: boolean) {
+function drawingSurface(canvas: OffscreenCanvas, wide: boolean): Surface | null {
   if (wide) {
     try {
       const context = canvas.getContext('2d', { colorSpace: 'display-p3' })
-      if (context) {
-        return { context, keepProfile: keepsDisplayP3(context) }
-      }
+      if (context) return { canvas, context, keepProfile: keepsDisplayP3(context) }
     } catch {
-      return srgbSurface(canvas)
+      // Display-P3 canvases are not supported everywhere; fall back to sRGB below.
     }
   }
 
-  return srgbSurface(canvas)
+  const context = canvas.getContext('2d')
+  return context ? { canvas, context, keepProfile: false } : null
 }
 
 function keepsDisplayP3(context: OffscreenCanvasRenderingContext2D) {
@@ -136,10 +265,4 @@ function keepsDisplayP3(context: OffscreenCanvasRenderingContext2D) {
     getContextAttributes?: () => { colorSpace?: string }
   }
   return withAttributes.getContextAttributes?.().colorSpace === 'display-p3'
-}
-
-function srgbSurface(canvas: OffscreenCanvas) {
-  const context = canvas.getContext('2d')
-  if (!context) return null
-  return { context, keepProfile: false }
 }
