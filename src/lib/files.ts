@@ -14,6 +14,7 @@ export const QUALITY_PRESETS = [
   { id: 'medium', value: 65 },
   { id: 'high', value: 80 },
   { id: 'best', value: 92 },
+  { id: 'original', value: 100 },
 ] as const
 
 const SUPPORTED_TYPES = new Set([

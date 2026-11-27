@@ -231,7 +231,7 @@ export function Controls() {
               delay={210}
               extra={<span className="text-3xl font-semibold tabular-nums leading-none">{quality}%</span>}
             >
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-5 gap-2">
                 {QUALITY_PRESETS.map((preset) => (
                   <button
                     key={preset.id}

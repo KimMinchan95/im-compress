@@ -123,7 +123,7 @@ export function BatchView() {
                 <span className="text-2xl font-semibold tabular-nums">{settings.quality}%</span>
               </div>
               {settings.format === 'png' ? <p className="text-sm text-muted">{t('pngHint')}</p> : null}
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-5 gap-2">
                   {QUALITY_PRESETS.map((preset) => (
                     <button
                       key={preset.id}
