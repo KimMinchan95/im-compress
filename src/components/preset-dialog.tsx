@@ -47,7 +47,7 @@ export function PresetDialog({ onClose, onApply, list = 'single' }: PresetDialog
 
   return createPortal(
     <div
-      className="overlay-in fixed inset-0 z-50 grid place-items-end bg-ink/75 px-4 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:place-items-center"
+      className="overlay-in fixed inset-0 z-50 grid place-items-end bg-ink/75 px-4 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:place-items-center"
       onClick={onClose}
     >
       <div
@@ -56,7 +56,7 @@ export function PresetDialog({ onClose, onApply, list = 'single' }: PresetDialog
         aria-modal="true"
         aria-labelledby="preset-dialog-title"
         tabIndex={-1}
-        className="flex max-h-[min(32rem,calc(100dvh-3rem))] w-full max-w-md flex-col rounded-3xl bg-panel p-5 shadow-2xl ring-1 ring-line outline-none"
+        className="flex max-h-[min(32rem,calc(100dvh-3rem))] w-full max-w-md flex-col rounded-3xl bg-panel p-5 ring-1 ring-line outline-none"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3">

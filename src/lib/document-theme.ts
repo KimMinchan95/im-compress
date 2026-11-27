@@ -1,6 +1,6 @@
 const THEME_COLOR = {
-  light: '#f3efe7',
-  dark: '#100f0d',
+  light: '#ffffff',
+  dark: '#000000',
 } as const
 
 export function paintDocumentTheme(theme: keyof typeof THEME_COLOR) {

@@ -18,7 +18,6 @@ export function Preview() {
 
   return (
     <section className="enter relative flex min-h-0 w-full min-w-0 flex-1 flex-col px-3 py-2 md:px-4 md:py-3">
-      <div className="orb orb-c" />
       <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col">
         <ImageStage
           originalUrl={source.url}

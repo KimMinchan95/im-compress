@@ -270,7 +270,7 @@ export function BatchView() {
             <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[60] flex justify-center px-4">
               <p
                 role="status"
-                className={`overlay-in rounded-full px-4 py-2.5 text-sm font-semibold shadow-[0_12px_40px_rgba(0,0,0,0.28)] ${
+                className={`overlay-in rounded-full px-4 py-2.5 text-sm font-semibold ring-1 ring-line ${
                   toast.tone === 'limit' ? 'bg-accent text-on-accent' : 'bg-cream text-ink'
                 }`}
               >
@@ -416,7 +416,7 @@ function BatchRow({
   return (
     <li
       style={style}
-      className="group relative shrink-0 overflow-hidden rounded-3xl bg-sunken ring-1 ring-line transition duration-200 hover:bg-panel hover:ring-cream/35 hover:shadow-[0_18px_40px_rgba(0,0,0,0.22)]"
+      className="group relative shrink-0 overflow-hidden rounded-3xl bg-sunken ring-1 ring-line transition duration-200 hover:bg-panel hover:ring-cream/35"
     >
       <button
         type="button"
@@ -456,7 +456,7 @@ function BatchRow({
         type="button"
         aria-label={t('batchRemove')}
         onClick={() => onRemove(item.id)}
-        className="absolute top-3 right-3 grid h-9 w-9 cursor-pointer place-items-center rounded-full bg-ink/75 text-cream/80 ring-1 ring-white/15 backdrop-blur-sm transition duration-200 hover:bg-ink hover:text-cream"
+        className="absolute top-3 right-3 grid h-9 w-9 cursor-pointer place-items-center rounded-full bg-ink/75 text-cream/80 ring-1 ring-white/15 transition duration-200 hover:bg-ink hover:text-cream"
       >
         <CloseIcon className="h-4 w-4" />
       </button>

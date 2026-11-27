@@ -75,13 +75,6 @@ export default function App() {
     >
       <ThemeSync />
       <EncodeBridge />
-      {hasSource || showBatch ? null : (
-        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-          <div className="orb orb-a" />
-          <div className="orb orb-b" />
-          <div className="orb orb-c" />
-        </div>
-      )}
       <div className="relative z-10 mx-auto flex h-full w-full flex-col">
         <Header />
         {hasSource ? (
@@ -97,7 +90,7 @@ export default function App() {
       </div>
       {isKakaoTalk() ? <KakaoGate /> : null}
       {isDragging ? (
-        <div className="overlay-in pointer-events-none absolute inset-0 z-20 grid place-items-center bg-ink/80 px-6 text-center backdrop-blur-sm">
+        <div className="overlay-in pointer-events-none absolute inset-0 z-20 grid place-items-center bg-ink/85 px-6 text-center">
           <p className="rise text-4xl font-semibold tracking-tight">{t('dropOverlay')}</p>
         </div>
       ) : null}

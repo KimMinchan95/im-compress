@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'
+import { useRef, type ComponentType, type PointerEvent } from 'react'
 import { FILE_ACCEPT, takeFiles } from '../lib/files'
 import { openIncoming } from '../lib/open-incoming'
 import { errorMessage } from '../lib/error-message'
@@ -25,9 +25,26 @@ export function DropZone() {
   const error = useEditorStore((state) => state.error)
   const isReading = useEditorStore((state) => state.isReading)
   const { locale, t } = useI18n()
+  const mainRef = useRef<HTMLElement>(null)
+  const title = t('heroTitle')
+  const words = title.split(' ')
+
+  const trackPointer = (event: PointerEvent<HTMLElement>) => {
+    const node = mainRef.current
+    if (!node) return
+    node.style.setProperty('--mx', `${event.clientX}px`)
+    node.style.setProperty('--my', `${event.clientY}px`)
+  }
 
   return (
-    <main className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-5 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-10 md:py-8">
+    <main
+      ref={mainRef}
+      onPointerMove={trackPointer}
+      className="landing relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-5 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-10 md:py-8"
+    >
+      <div className="landing-glow" aria-hidden="true" />
+      <div className="landing-wash" aria-hidden="true" />
+      <div className="landing-grain" aria-hidden="true" />
       <div className="relative z-10 mx-auto my-auto grid w-full max-w-6xl grid-cols-1 items-center gap-6 md:grid-cols-2 md:gap-16">
         <div className="contents md:flex md:flex-col md:justify-center">
           <div className="order-1 text-center md:order-none md:text-left">
@@ -35,8 +52,17 @@ export function DropZone() {
               <span className="brand-dot inline-block h-2 w-2 rounded-full bg-accent" />
               {t('eyebrow')}
             </p>
-            <h1 className="hero-sheen rise mt-4 break-keep text-[2rem] leading-[1.2] font-semibold tracking-tight sm:text-5xl xl:text-7xl" style={{ animationDelay: '80ms' }}>
-              {t('heroTitle')}
+            <h1 aria-label={title} className="mt-4 break-keep text-[2rem] leading-[1.2] font-normal tracking-tight sm:text-5xl xl:text-7xl">
+              {words.map((word, index) => (
+                <span key={`${word}-${index}`} aria-hidden="true">
+                  {index > 0 ? ' ' : null}
+                  <span className="word-mask">
+                    <span className="word-rise" style={{ animationDelay: `${160 + index * 110}ms` }}>
+                      {word}
+                    </span>
+                  </span>
+                </span>
+              ))}
             </h1>
             <p className="rise mx-auto mt-4 max-w-xl break-keep text-base text-muted md:mx-0" style={{ animationDelay: '150ms' }}>
               <span className="block">{t('heroBody')}</span>
@@ -78,9 +104,8 @@ export function DropZone() {
           <div className="order-3 mx-auto w-full max-w-md md:order-none">
             <CompareShowcase original={t('original')} compressed={t('compressed')} />
           </div>
-          <div className="drop-shell rise order-2 mx-auto w-full max-w-md md:order-none" style={{ animationDelay: '260ms' }}>
-            <div className="drop-spin" aria-hidden="true" />
-            <label className="drop-face">
+          <div className="rise order-2 mx-auto w-full max-w-md md:order-none" style={{ animationDelay: '260ms' }}>
+            <label className="drop-face group">
               <input
                 type="file"
                 accept={FILE_ACCEPT}
@@ -88,7 +113,11 @@ export function DropZone() {
                 className="sr-only"
                 onChange={(event) => openIncoming(takeFiles(event.currentTarget))}
               />
-              <span className={`grid h-16 w-16 place-items-center rounded-2xl bg-accent text-3xl font-semibold text-on-accent ${isReading ? 'animate-pulse' : 'bob'}`}>
+              <i className="corner corner-tl" aria-hidden="true" />
+              <i className="corner corner-tr" aria-hidden="true" />
+              <i className="corner corner-bl" aria-hidden="true" />
+              <i className="corner corner-br" aria-hidden="true" />
+              <span className={`grid h-16 w-16 place-items-center bg-accent text-3xl font-normal text-on-accent transition-colors duration-300 group-hover:bg-cream group-hover:text-ink ${isReading ? 'animate-pulse' : 'brand-dot'}`}>
                 +
               </span>
               <span className="mt-6 break-keep text-2xl font-semibold">{isReading ? t('dropReading') : t('dropTitle')}</span>
@@ -115,6 +144,7 @@ function CompareShowcase({ original, compressed }: CompareShowcaseProps) {
         <div className="showcase-base" />
         <div className="showcase-top" />
         <div className="showcase-bar" />
+        <span className="showcase-stat" />
         <span className="showcase-chip showcase-chip-a">
           {original} · 2.4 MB
         </span>

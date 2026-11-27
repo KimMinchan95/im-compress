@@ -216,7 +216,7 @@ export function Controls() {
                     onClick={() => setFormat(item)}
                     className={`h-12 cursor-pointer rounded-2xl text-base font-semibold transition duration-200 active:scale-[0.97] ${
                       format === item
-                        ? 'bg-cream text-ink shadow-[0_8px_24px_rgba(0,0,0,0.12)]'
+                        ? 'bg-cream text-ink'
                         : 'bg-panel text-cream hover:-translate-y-0.5 hover:bg-cream/10'
                     }`}
                   >
@@ -465,7 +465,7 @@ function SaveToast({ tone, message }: { tone: ToastTone; message: string }) {
     <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[60] flex justify-center px-4">
       <p
         role="status"
-        className={`overlay-in rounded-full px-4 py-2.5 text-sm font-semibold shadow-[0_12px_40px_rgba(0,0,0,0.28)] ${
+        className={`overlay-in rounded-full px-4 py-2.5 text-sm font-semibold ring-1 ring-line ${
           tone === 'limit' ? 'bg-accent text-on-accent' : 'bg-cream text-ink'
         }`}
       >

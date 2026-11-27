@@ -24,7 +24,7 @@ interface ZoomAnchor {
 
 const ZOOM_STEP = 1.2
 const SPLIT_LABEL =
-  'pointer-events-none absolute z-20 whitespace-nowrap rounded-full bg-[#100f0d]/75 px-2.5 py-1 text-xs font-medium text-[#f6f1e7]'
+  'pointer-events-none absolute z-20 whitespace-nowrap rounded-full bg-black/75 px-2.5 py-1 text-xs font-medium text-[#fafafa]'
 
 function contain(width: number, height: number, maxWidth: number, maxHeight: number) {
   if (width < 1 || height < 1 || maxWidth < 1 || maxHeight < 1) return { w: 0, h: 0 }
@@ -458,7 +458,7 @@ export function ImageStage({ originalUrl, resultUrl, width, height, layout, capt
             }}
           >
             <span className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/95 shadow-[0_0_0_1px_rgba(0,0,0,0.18)]" />
-            <span className="absolute top-1/2 left-1/2 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-px rounded-full bg-[#f6f1e7] text-[#100f0d] shadow-[0_6px_16px_rgba(0,0,0,0.28)] ring-1 ring-black/10">
+            <span className="absolute top-1/2 left-1/2 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-px rounded-full bg-[#fafafa] text-black ring-1 ring-black/10">
               <svg viewBox="0 0 8 12" className="h-3 w-2" aria-hidden="true">
                 <path d="M6 1.5 2.5 6 6 10.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
